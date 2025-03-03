@@ -25,7 +25,8 @@
 		} catch (err) {
 			error = (err as Error).message;
 		}
-		initializeDarkMode(); // Inicializar el modo oscuro
+		initializeDarkMode();
+		document.body.classList.toggle('dark-mode', darkMode);
 	});
 
 	// Función para cargar los libros según la versión seleccionada
@@ -57,11 +58,12 @@
 		localStorage.setItem('darkMode', darkMode.toString());
 	}
 
-	// Inicializar el modo oscuro según las preferencias del usuario
 	function initializeDarkMode() {
 		const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 		const userPreference = localStorage.getItem('darkMode');
 		darkMode = userPreference ? userPreference === 'true' : systemPrefersDark;
+
+		console.log('Modo oscuro activado:', darkMode); // Agregar un log para depuración
 
 		if (darkMode) {
 			document.body.classList.add('dark-mode');
