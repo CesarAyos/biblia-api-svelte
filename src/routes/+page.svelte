@@ -196,7 +196,7 @@
 <main>
     <div class="resultados">
       {#if loadingSearch}
-        <p>Cargando resultados... Página {currentPage} de 50</p>
+        <p class="text-center text-primary">Buscando {currentPage} </p>
       {:else if searchResults && searchResults.data.length > 0}
         <h3>Resultados de la búsqueda:</h3>
         <ul>
