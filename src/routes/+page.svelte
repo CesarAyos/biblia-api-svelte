@@ -25,8 +25,11 @@
 		} catch (err) {
 			error = (err as Error).message;
 		}
-		initializeDarkMode();
+		darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
 		document.body.classList.toggle('dark-mode', darkMode);
+
+		// Para depuración
+		console.log('Modo oscuro activado:', darkMode);
 	});
 
 	// Función para cargar los libros según la versión seleccionada
@@ -157,15 +160,30 @@
 								</select>
 							</label>
 						{:else if selectedVersion}
-						<div class="spinner-border text-primary" role="status">
-							<span class="visually-hidden">Loading...</span>
-						  </div>
-						  <div class="spinner-border text-secondary" role="status">
-							<span class="visually-hidden">Loading...</span>
-						  </div>
-						  <div class="spinner-border text-success" role="status">
-							<span class="visually-hidden">Loading...</span>
-						  </div>
+							<div class="spinner-border text-primary" role="status">
+								<span class="visually-hidden">Loading...</span>
+							</div>
+							<div class="spinner-border text-secondary" role="status">
+								<span class="visually-hidden">Loading...</span>
+							</div>
+							<div class="spinner-border text-success" role="status">
+								<span class="visually-hidden">Loading...</span>
+							</div>
+							<div class="spinner-border text-danger" role="status">
+								<span class="visually-hidden">Loading...</span>
+							</div>
+							<div class="spinner-border text-warning" role="status">
+								<span class="visually-hidden">Loading...</span>
+							</div>
+							<div class="spinner-border text-info" role="status">
+								<span class="visually-hidden">Loading...</span>
+							</div>
+							<div class="spinner-border text-light" role="status">
+								<span class="visually-hidden">Loading...</span>
+							</div>
+							<div class="spinner-border text-dark" role="status">
+								<span class="visually-hidden">Loading...</span>
+							</div>
 						{/if}
 					</div>
 				</li>
@@ -202,49 +220,48 @@
 
 <!-- Resultados y mensajes -->
 <main>
-    <div class="resultados">
-      {#if loadingSearch}
-	  <div class="d-flex justify-content-center" style="margin-top: 200px;">
-	  <div class="spinner-grow text-primary m-2" role="status">
-		<span class="visually-hidden">Loading...</span>
-	  </div>
-	  <div class="spinner-grow text-secondary m-2" role="status">
-		<span class="visually-hidden">Loading...</span>
-	  </div>
-	  <div class="spinner-grow text-success m-2" role="status">
-		<span class="visually-hidden">Loading...</span>
-	  </div>
-	  <div class="spinner-grow text-danger m-2" role="status">
-		<span class="visually-hidden">Loading...</span>
-	  </div>
-	  <div class="spinner-grow text-warning m-2" role="status">
-		<span class="visually-hidden">Loading...</span>
-	  </div>
-	  <div class="spinner-grow text-info m-2" role="status">
-		<span class="visually-hidden">Loading...</span>
-	  </div>
-	  <div class="spinner-grow text-light m-2" role="status">
-		<span class="visually-hidden">Loading...</span>
-	  </div>
-	  <div class="spinner-grow text-dark m-2" role="status">
-		<span class="visually-hidden">Loading...</span>
-	  </div>
+	<div class="resultados">
+		{#if loadingSearch}
+			<div class="d-flex justify-content-center" style="margin-top: 200px;">
+				<div class="spinner-grow text-primary m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-secondary m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-success m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-danger m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-warning m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-info m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-light m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-dark m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+			</div>
+		{:else if searchResults && searchResults.data.length > 0}
+			<h3>Resultados de la búsqueda:</h3>
+			<ul>
+				{#each searchResults.data as result}
+					<li class="versiculo">
+						<strong>{result.book} {result.chapter}:{result.number}</strong> - {result.verse}
+					</li>
+				{/each}
+			</ul>
+		{:else if searchQuery && searchResults && searchResults.data.length === 0}
+			<p>No se encontraron resultados para "{searchQuery}".</p>
+		{/if}
 	</div>
-      {:else if searchResults && searchResults.data.length > 0}
-        <h3>Resultados de la búsqueda:</h3>
-        <ul>
-          {#each searchResults.data as result}
-            <li class="versiculo">
-              <strong>{result.book} {result.chapter}:{result.number}</strong> - {result.verse}
-            </li>
-          {/each}
-        </ul>
-      {:else if searchQuery && searchResults && searchResults.data.length === 0}
-        <p>No se encontraron resultados para "{searchQuery}".</p>
-      {/if}
-    </div>
-  </main>
-  
+</main>
 
 <style>
 	@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap');
@@ -270,27 +287,30 @@
 	}
 
 	:global(:root) {
-  --background-color: white;
-  --text-color: black;
-}
+		--background-color: white;
+		--text-color: black;
+	}
 
-:global(body.dark-mode) {
-  --background-color: #1e1e2f;
-  --text-color: #e0e0e0;
-}
+	:global(body.dark-mode) {
+		--background-color: #1e1e2f;
+		--text-color: #e0e0e0;
+	}
 
-:global(body) {
-  background-color: var(--background-color);
-  color: var(--text-color);
-  transition: background-color 0.5s, color 0.5s;
-}
+	:global(body) {
+		background-color: var(--background-color);
+		color: var(--text-color);
+		transition:
+			background-color 0.5s,
+			color 0.5s;
+	}
 
-:global(.versiculo, .libro, .resultados) {
-  background-color: var(--background-color);
-  color: var(--text-color);
-  transition: background-color 0.5s, color 0.5s;
-}
-
+	:global(.versiculo, .libro, .resultados) {
+		background-color: var(--background-color);
+		color: var(--text-color);
+		transition:
+			background-color 0.5s,
+			color 0.5s;
+	}
 
 	:global(select),
 	:global(button) {
