@@ -28,8 +28,7 @@
 		darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
 		document.body.classList.toggle('dark-mode', darkMode);
 
-		// Para depuración
-		console.log('Modo oscuro activado:', darkMode);
+		initializeDarkMode();
 	});
 
 	// Función para cargar los libros según la versión seleccionada

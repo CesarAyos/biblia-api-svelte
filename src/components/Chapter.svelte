@@ -66,7 +66,7 @@
 
 	<!-- Indicador de carga -->
 	{#if isLoading}
-		<div class="d-flex justify-content-center">
+		<div class="d-flex justify-content-center" style="margin-top: 200px;">
 			<div class="spinner-border text-primary" role="status">
 				<span class="visually-hidden">Loading...</span>
 			</div>
