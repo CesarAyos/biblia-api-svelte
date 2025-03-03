@@ -157,7 +157,15 @@
 								</select>
 							</label>
 						{:else if selectedVersion}
-							<p>Cargando libros...</p>
+						<div class="spinner-border text-primary" role="status">
+							<span class="visually-hidden">Loading...</span>
+						  </div>
+						  <div class="spinner-border text-secondary" role="status">
+							<span class="visually-hidden">Loading...</span>
+						  </div>
+						  <div class="spinner-border text-success" role="status">
+							<span class="visually-hidden">Loading...</span>
+						  </div>
 						{/if}
 					</div>
 				</li>
@@ -196,7 +204,32 @@
 <main>
     <div class="resultados">
       {#if loadingSearch}
-        <p class="text-center text-primary">Buscando {currentPage} </p>
+	  <div class="d-flex justify-content-center" style="margin-top: 200px;">
+	  <div class="spinner-grow text-primary m-2" role="status">
+		<span class="visually-hidden">Loading...</span>
+	  </div>
+	  <div class="spinner-grow text-secondary m-2" role="status">
+		<span class="visually-hidden">Loading...</span>
+	  </div>
+	  <div class="spinner-grow text-success m-2" role="status">
+		<span class="visually-hidden">Loading...</span>
+	  </div>
+	  <div class="spinner-grow text-danger m-2" role="status">
+		<span class="visually-hidden">Loading...</span>
+	  </div>
+	  <div class="spinner-grow text-warning m-2" role="status">
+		<span class="visually-hidden">Loading...</span>
+	  </div>
+	  <div class="spinner-grow text-info m-2" role="status">
+		<span class="visually-hidden">Loading...</span>
+	  </div>
+	  <div class="spinner-grow text-light m-2" role="status">
+		<span class="visually-hidden">Loading...</span>
+	  </div>
+	  <div class="spinner-grow text-dark m-2" role="status">
+		<span class="visually-hidden">Loading...</span>
+	  </div>
+	</div>
       {:else if searchResults && searchResults.data.length > 0}
         <h3>Resultados de la búsqueda:</h3>
         <ul>
