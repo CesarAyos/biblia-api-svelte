@@ -53,7 +53,7 @@
 								loadChapter();
 							}}
 							disabled={isLoading}
-							class="btn btn-primary"
+							class="btn btn-warning text-dark"
 							style="min-width: 130px;"
 						>
 							Capítulo {chapter}
@@ -96,11 +96,11 @@
 
 	<!-- Mostrar versículos -->
 	{#if chapterData && chapterData.vers?.length > 0}
-		<h3 class="text-center">Capítulo {selectedChapter}</h3>
+		<h3 class="text-center text-warning-emphasis">Capítulo {selectedChapter}</h3>
 		<ul>
 			{#each chapterData.vers as verse}
-				<li>
-					<strong>{verse.number}:</strong>
+				<li class="text-white">
+					<strong class="text-warning-emphasis">{verse.number}:</strong>
 					{verse.verse}
 				</li>
 			{/each}
