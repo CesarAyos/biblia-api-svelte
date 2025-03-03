@@ -215,11 +215,11 @@
                 </div>
             </div>
         {:else if searchResults && searchResults.data.length > 0}
-            <h3>Resultados de la búsqueda:</h3>
+            <h3 class="text-warning-emphasis">Resultados de la búsqueda:</h3>
             <ul>
                 {#each searchResults.data as result}
-                    <li class="versiculo ">
-                        <strong>{result.book} {result.chapter}:{result.number}</strong> - {result.verse}
+                    <li class="versiculo text-white">
+                        <strong class="text-warning-emphasis">{result.book} {result.chapter}:{result.number}</strong> - {result.verse}
                     </li>
                 {/each}
             </ul>
