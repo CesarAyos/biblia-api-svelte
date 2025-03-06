@@ -1,5 +1,5 @@
 {
-	"name": "my-app",
+	"name": "biblia",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
@@ -23,5 +23,8 @@
 		"svelte-check": "^4.0.0",
 		"typescript": "^5.0.0",
 		"vite": "^6.0.0"
+	},
+	"dependencies": {
+		"dexie": "^4.0.11"
 	}
 }

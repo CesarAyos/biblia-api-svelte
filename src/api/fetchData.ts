@@ -28,72 +28,152 @@ export interface ChapterData {
   testament: string; // Testamento
 }
 
-// Interfaz para los datos de búsqueda
-export interface SearchData {
+// Tipo para los datos de búsqueda
+export type SearchData = {
   data: Array<{
-    book: string; // Nombre del libro
-    chapter: number; // Número del capítulo
-    number: number; // Número del versículo
-    verse: string; // Texto del versículo
-    id: number; // ID único del versículo
-    study?: string; // Estudio opcional
+    id: number;
+    verse: string;
+    book: string;
+    chapter: number;
+    number: number;
   }>;
+  pagination?: {
+    page: number; // Página actual
+    total_pages: number; // Número total de páginas
+    total_results: number; // Total de resultados
+  };
   total: number; // Total de resultados
   page: number; // Página actual
-  take: number; // Cantidad de resultados por página
+  take: number; // Resultados por página
+};
+
+// Función para abrir la base de datos de IndexedDB
+function openDatabase(dbName: string, version: number): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, version);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains("cache")) {
+        db.createObjectStore("cache", { keyPath: "key" });
+        console.log("Almacén de objetos 'cache' creado");
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Función para guardar datos en IndexedDB
+async function saveToIndexedDB(dbName: string, key: string, data: any): Promise<void> {
+  try {
+    const db = await openDatabase(dbName, 1);
+    const transaction = db.transaction("cache", "readwrite");
+    const store = transaction.objectStore("cache");
+    store.put({ key, data, timestamp: Date.now() });
+    console.log(`Guardado en IndexedDB: clave=${key}`, data);
+
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error("Error guardando en IndexedDB:", error);
+    throw error;
+  }
+}
+
+// Función para recuperar datos de IndexedDB
+async function getFromIndexedDB(dbName: string, key: string): Promise<any | null> {
+  try {
+    const db = await openDatabase(dbName, 1);
+    const transaction = db.transaction("cache", "readonly");
+    const store = transaction.objectStore("cache");
+    const request = store.get(key);
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => {
+        console.log(`Recuperado de IndexedDB (clave=${key}):`, request.result);
+        resolve(request.result ? request.result : null);
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error("Error recuperando de IndexedDB:", error);
+    throw error;
+  }
+}
+
+// Función para verificar expiración del caché
+function isCacheExpired(timestamp: number, expirationInHours: number): boolean {
+  const isExpired = Date.now() > timestamp + expirationInHours * 60 * 60 * 1000;
+  console.log(`¿Caché expirado? ${isExpired} (timestamp=${timestamp})`);
+  return isExpired;
 }
 
 // Función para obtener las versiones de la Biblia
 export async function fetchVersions(): Promise<Version[]> {
-  const url = 'https://bible-api.deno.dev/api/versions';
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      throw new Error(`Error al obtener las versiones: ${resp.status} ${resp.statusText}`);
-    }
-    return await resp.json();
-  } catch (error) {
-    console.error("Error en fetchVersions:", error);
-    throw error;
+  const dbName = "BibleCache";
+  const cacheKey = "bible_versions";
+
+  const cached = await getFromIndexedDB(dbName, cacheKey);
+  if (cached && !isCacheExpired(cached.timestamp, 24)) {
+    return cached.data; // Retornar datos desde caché
   }
+
+  const url = "https://bible-api.deno.dev/api/versions";
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Error al obtener las versiones: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  await saveToIndexedDB(dbName, cacheKey, data);
+  return data;
 }
 
 // Función para obtener los libros de una versión
 export async function fetchBooks(version: string): Promise<Book[]> {
-  if (!version) throw new Error("El parámetro 'version' es obligatorio.");
+  const dbName = "BibleCache";
+  const cacheKey = `books_${version}`;
+
+  const cached = await getFromIndexedDB(dbName, cacheKey);
+  if (cached && !isCacheExpired(cached.timestamp, 24)) {
+    return cached.data; // Retornar datos desde caché
+  }
 
   const url = `https://bible-api.deno.dev/api/books?version=${version}`;
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      throw new Error(`Error al obtener los libros de la versión "${version}": ${resp.status} ${resp.statusText}`);
-    }
-    return await resp.json();
-  } catch (error) {
-    console.error("Error en fetchBooks:", error);
-    throw error;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Error al obtener los libros: ${response.status} ${response.statusText}`);
   }
+
+  const data = await response.json();
+  await saveToIndexedDB(dbName, cacheKey, data);
+  return data;
 }
 
-// Función para obtener los versículos de un capítulo
+// Función para obtener un capítulo
 export async function fetchChapter(version: string, book: string, chapter: number): Promise<ChapterData> {
-  if (!version || !book || !chapter) {
-    throw new Error("Los parámetros 'version', 'book' y 'chapter' son obligatorios.");
+  const dbName = "BibleCache";
+  const cacheKey = `chapter_${version}_${book}_${chapter}`;
+
+  const cached = await getFromIndexedDB(dbName, cacheKey);
+  if (cached && !isCacheExpired(cached.timestamp, 24)) {
+    return cached.data; // Retornar datos desde caché
   }
 
   const url = `https://bible-api.deno.dev/api/read/${version}/${book}/${chapter}`;
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      throw new Error(
-        `Error al obtener el capítulo ${chapter} del libro "${book}" en la versión "${version}": ${resp.status} ${resp.statusText}`
-      );
-    }
-    return await resp.json();
-  } catch (error) {
-    console.error("Error en fetchChapter:", error);
-    throw error;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Error al obtener el capítulo: ${response.status} ${response.statusText}`);
   }
+
+  const data = await response.json();
+  await saveToIndexedDB(dbName, cacheKey, data);
+  return data;
 }
 
 // Función para realizar búsquedas
@@ -103,14 +183,11 @@ export async function fetchSearch(version: string, query: string, take: number =
   }
 
   const url = `https://bible-api.deno.dev/api/read/${version}/search?q=${encodeURIComponent(query)}&take=${take}&page=${page}`;
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      throw new Error(`Error al realizar la búsqueda: ${resp.status} ${resp.statusText}`);
-    }
-    return await resp.json();
-  } catch (error) {
-    console.error("Error en fetchSearch:", error);
-    throw error;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Error al realizar la búsqueda: ${response.status} ${response.statusText}`);
   }
+
+  return await response.json();
 }
