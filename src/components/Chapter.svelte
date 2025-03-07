@@ -1,209 +1,339 @@
 <script lang="ts">
-    import { fetchChapter } from '../api/fetchData.js';
-    import type { ChapterData, Book } from '../api/fetchData.js';
+	import { fetchChapter } from '../api/fetchData.js';
+	import type { ChapterData, Book } from '../api/fetchData.js';
 
-    export let selectedBook: string;
-    export let selectedVersion: string;
-    export let bookDetails: Book | null = null;
+	export let selectedBook: string;
+	export let selectedVersion: string;
+	export let bookDetails: Book | null = null;
+	let selectedChapter: number | null = null;
+	let chapterData: ChapterData | null = null;
+	let isLoading = false;
+	let error: string | null = null;
+	let feedbackMessage: string | null = null;
+	let selectedVerses: { number: number; text: string }[] = [];
+	let showModal = false; // Controla la visibilidad del modal
 
-    let selectedChapter: number | null = null;
-    let chapterData: ChapterData | null = null;
-    let isLoading = false;
-    let error: string | null = null;
-    let feedbackMessage: string | null = null;
-    let selectedVerses: { number: number; text: string }[] = [];
+	function goToVerse(verseNumber: number) {
+		const verseElement = document.getElementById(`verse-${verseNumber}`);
+		if (verseElement) {
+			verseElement.scrollIntoView({ behavior: 'smooth' }); // Desplázate suavemente
+			closeModal(); // Cierra el modal después de desplazarse
+		} else {
+			console.error(`El versículo ${verseNumber} no se encontró.`);
+		}
+	}
 
-    async function loadChapter() {
-        if (!selectedBook || !selectedChapter || !selectedVersion) {
-            error = 'Por favor selecciona un libro, versión y capítulo válidos.';
-            return;
-        }
-        isLoading = true;
-        chapterData = null;
-        error = null;
-        selectedVerses = [];
-        feedbackMessage = null;
+	async function loadChapter() {
+		if (!selectedBook || !selectedChapter || !selectedVersion) {
+			error = 'Por favor selecciona un libro, versión y capítulo válidos.';
+			return;
+		}
 
-        try {
-            chapterData = await fetchChapter(
-                selectedVersion,
-                selectedBook.toLowerCase(),
-                selectedChapter
-            );
-        } catch (err) {
-            const errorObj = err as Error;
-            error = errorObj.message || 'Error al cargar el capítulo.';
-        } finally {
-            isLoading = false;
-        }
-    }
+		isLoading = true;
+		chapterData = null;
+		error = null;
+		selectedVerses = [];
+		feedbackMessage = null;
 
-    function toggleVerseSelection(verseNumber: number, verseText: string) {
-        const index = selectedVerses.findIndex((v) => v.number === verseNumber);
-        if (index >= 0) {
-            selectedVerses.splice(index, 1);
-        } else {
-            selectedVerses.push({ number: verseNumber, text: verseText });
-        }
-        selectedVerses = [...selectedVerses];
-    }
+		try {
+			chapterData = await fetchChapter(
+				selectedVersion,
+				selectedBook.toLowerCase(),
+				selectedChapter
+			);
+		} catch (err) {
+			const errorObj = err as Error;
+			error = errorObj.message || 'Error al cargar el capítulo.';
+		} finally {
+			isLoading = false;
+		}
+	}
 
-    function copySelectedVerses() {
-        if (selectedVerses.length > 0) {
-            const textToCopy = selectedVerses
-                .map(
-                    (v) =>
-                        `${selectedBook || 'Libro desconocido'} (${selectedVersion || 'Versión desconocida'}), Capítulo ${selectedChapter || 'N/A'}, Versículo ${v.number}: ${v.text}`
-                )
-                .join('\n');
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                feedbackMessage = 'Texto copiado al portapapeles.';
-                setTimeout(() => (feedbackMessage = null), 3000);
-            });
-        } else {
-            feedbackMessage = 'Selecciona al menos un versículo para copiar.';
-            setTimeout(() => (feedbackMessage = null), 3000);
-        }
-    }
+	function toggleVerseSelection(verseNumber: number, verseText: string) {
+		const index = selectedVerses.findIndex((v) => v.number === verseNumber);
+		if (index >= 0) {
+			selectedVerses.splice(index, 1);
+		} else {
+			selectedVerses.push({ number: verseNumber, text: verseText });
+		}
+		selectedVerses = [...selectedVerses];
+	}
 
-    function shareSelectedVersesViaWhatsApp() {
-        if (selectedVerses.length > 0) {
-            const textToShare = selectedVerses
-                .map(
-                    (v) =>
-                        `${selectedBook || 'Libro desconocido'} (${selectedVersion || 'Versión desconocida'}), Capítulo ${selectedChapter || 'N/A'}, Versículo ${v.number}: ${v.text}`
-                )
-                .join('\n');
-            const shareURL = `https://wa.me/?text=${encodeURIComponent(textToShare)}`;
-            window.open(shareURL, '_blank');
-        } else {
-            feedbackMessage = 'Selecciona al menos un versículo para compartir.';
-            setTimeout(() => (feedbackMessage = null), 3000);
-        }
-    }
+	function copySelectedVerses() {
+		if (selectedVerses.length > 0) {
+			const textToCopy = selectedVerses
+				.map(
+					(v) =>
+						`${selectedBook || 'Libro desconocido'} (${
+							selectedVersion || 'Versión desconocida'
+						}), Capítulo ${selectedChapter || 'N/A'}, Versículo ${v.number}: ${v.text}`
+				)
+				.join('\n');
+			navigator.clipboard.writeText(textToCopy).then(() => {
+				feedbackMessage = 'Texto copiado al portapapeles.';
+				setTimeout(() => (feedbackMessage = null), 3000);
+			});
+		} else {
+			feedbackMessage = 'Selecciona al menos un versículo para copiar.';
+			setTimeout(() => (feedbackMessage = null), 3000);
+		}
+	}
+
+	function shareSelectedVersesViaWhatsApp() {
+		if (selectedVerses.length > 0) {
+			const textToShare = selectedVerses
+				.map(
+					(v) =>
+						`${selectedBook || 'Libro desconocido'} (${
+							selectedVersion || 'Versión desconocida'
+						}), Capítulo ${selectedChapter || 'N/A'}, Versículo ${v.number}: ${v.text}`
+				)
+				.join('\n');
+			const shareURL = `https://wa.me/?text=${encodeURIComponent(textToShare)}`;
+			window.open(shareURL, '_blank');
+		} else {
+			feedbackMessage = 'Selecciona al menos un versículo para compartir.';
+			setTimeout(() => (feedbackMessage = null), 3000);
+		}
+	}
+
+	function closeModal() {
+		showModal = false;
+	}
 </script>
 
 <main>
-    <div class="overflow-x-auto mt-4">
-        {#if bookDetails}
-            <section class="chapter-container">
-                {#each Array(bookDetails.chapters).fill(0).map((_, i) => i + 1) as chapter}
-                    <button
-                        type="button"
-                        on:click={() => {
-                            selectedChapter = chapter;
-                            loadChapter();
-                        }}
-                        disabled={isLoading}
-                        class="chapter-btn"
-                    >
-                        Capítulo {chapter}
-                    </button>
-                {/each}
-            </section>
-        {/if}
-    </div>
+	<div class="chapter-dropdown ">
+		{#if bookDetails}
+			<select
+				class="form-select"
+				bind:value={selectedChapter}
+				on:change={loadChapter}
+				disabled={isLoading}
+			>
+				<option value="" disabled selected>Selecciona un capítulo</option>
+				{#each Array(bookDetails.chapters)
+					.fill(0)
+					.map((_, i) => i + 1) as chapter}
+					<option class="text-warning-emphasis" value={chapter}>Capítulo {chapter}</option>
+				{/each}
+			</select>
+		{/if}
+	</div>
 
-    {#if isLoading}
-        <div class="loader-container">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
-    {/if}
+	{#if isLoading}
+		<div class="loader-container">
+			<div class="spinner-border text-primary" role="status">
+				<span class="visually-hidden">Loading...</span>
+			</div>
+		</div>
+	{/if}
 
-    {#if chapterData && chapterData.vers?.length > 0}
-        <div class="sticky-container">
-            <h3 class="text-center text-warning-emphasis">Capítulo {selectedChapter}</h3>
+	{#if chapterData && chapterData.vers?.length > 0}
+		<h3 class="text-center text-warning-emphasis">Capítulo {selectedChapter}</h3>
 
-            {#if selectedVerses.length > 0}
-                <div id="actions" class="actions-container">
-                    <button on:click={copySelectedVerses} class="btn btn-primary">Copiar</button>
-                    <button on:click={shareSelectedVersesViaWhatsApp} class="btn btn-success">WhatsApp</button>
-                    <p class="feedback-message">{feedbackMessage}</p>
-                </div>
-            {/if}
-        </div>
+		{#if selectedVerses.length > 0}
+			<div id="actions" class="overflow-auto sticky-actions d-flex justify-content-center">
+				<button on:click={copySelectedVerses} class="btn btn-primary">Copiar</button>
+				<button on:click={shareSelectedVersesViaWhatsApp} class="btn btn-success">WhatsApp</button>
+				<p class="feedback-message mt-2">{feedbackMessage}</p>
+			</div>
+		{/if}
 
-        <ul class="verse-list scroll-container">
-            {#each chapterData.vers as verse}
-                <li class="verse-item">
-                    <button
-                        type="button"
-                        class="verse-btn {selectedVerses.find((v) => v.number === verse.number) ? 'selected' : ''}"
-                        on:click={() => toggleVerseSelection(verse.number, verse.verse)}
-                    >
-                        <strong class="verse-number">{verse.number}:</strong> {verse.verse}
-                    </button>
-                </li>
-            {/each}
-        </ul>
-    {/if}
+		<ul class="verse-list">
+			{#each chapterData.vers as verse}
+				<li id="verse-{verse.number}" class="verse-item">
+					<button
+						type="button"
+						class="verse-btn {selectedVerses.find((v) => v.number === verse.number)
+							? 'selected'
+							: ''}"
+						on:click={() => toggleVerseSelection(verse.number, verse.verse)}
+					>
+						<strong class="verse-number">{verse.number}:</strong>
+						{verse.verse}
+					</button>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	<!-- Modal -->
+	{#if showModal}
+		<div class="modal">
+			<div class="modal-content">
+				<h3>Selecciona un versículo</h3>
+				{#if chapterData}
+					<ul class="modal-verse-list">
+						{#each chapterData.vers as verse}
+							<li class="modal-verse-item">
+								<button type="button" on:click={() => goToVerse(verse.number)}>
+									Versículo {verse.number}
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p>No hay datos disponibles para los versículos.</p>
+				{/if}
+				<button class="close-btn" on:click={() => closeModal()}>Cerrar</button>
+			</div>
+		</div>
+	{/if}
 </main>
 
-
-  
 <style>
-	.sticky-container {
-    position: sticky;
-    top: 0; /* Mantenerse pegado a la parte superior */
-    background-color: #f8f9fa;
-    z-index: 10;
-    padding: 10px;
-    border-bottom: 1px solid #dee2e6;
-}
+	.chapter-dropdown {
+		padding: 10px;
+		margin: 0 auto;
+		text-align: center;
+	}
 
-.scroll-container {
-    max-height: 400px; /* Altura máxima del contenedor de versículos */
-    overflow-y: auto; /* Activar desplazamiento vertical */
-    padding: 10px;
-    background-color: #fefefe;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-}
+	.form-select {
+		width: 100%;
+		max-width: 300px;
+		padding: 8px;
+		border-radius: 5px;
+		border: 1px solid #ced4da;
+		background-color: #f8f9fa;
+		color: #212529;
+		cursor: pointer;
+	}
 
-.chapter-container {
-    display: flex;
-    gap: 10px;
-    padding: 10px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-}
-.chapter-btn {
-    min-width: 130px;
-    padding: 8px;
-    border: none;
-    border-radius: 5px;
-    background-color: #ffc107;
-    color: #212529;
-    cursor: pointer;
-}
-.chapter-btn:hover {
-    background-color: #e0a800;
-}
+	.form-select:focus {
+		outline: none;
+		border-color: #ffc107;
+		box-shadow: 0 0 5px rgba(255, 193, 7, 0.5);
+	}
 
-.verse-item {
-    margin-bottom: 5px;
-}
+	.form-select:disabled {
+		background-color: #e9ecef;
+		color: #adb5bd;
+		cursor: not-allowed;
+	}
 
-.verse-btn {
-    all: unset;
-    cursor: pointer;
-    background-color: #212529;
-    color: #f8f9fa;
-    padding: 8px;
-    border-radius: 4px;
-    width: 100%;
-    display: block;
-    text-align: left;
-}
-.verse-btn:hover {
-    background-color: #495057;
-}
-.verse-btn.selected {
-    background-color: #198754;
-    color: #fff;
-}
+	.loader-container {
+		margin-top: 200px;
+	}
 
+	.verse-item {
+		margin-bottom: 5px;
+	}
+
+	.verse-btn {
+		all: unset;
+		cursor: pointer;
+		background-color: #212529;
+		color: #f8f9fa;
+		padding: 8px;
+		border-radius: 4px;
+		width: 100%;
+		display: block;
+		text-align: left;
+	}
+	.verse-btn:hover {
+		background-color: #495057;
+	}
+	.verse-btn.selected {
+		background-color: #198754;
+		color: #fff;
+	}
+
+	/* Modal estilos */
+	.modal {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		background-color: rgba(0, 0, 0, 0.6);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+	}
+
+	.modal-content {
+		background-color: white;
+		padding: 20px;
+		border-radius: 8px;
+		max-width: 600px;
+		width: 90%;
+		text-align: center;
+	}
+
+	.modal-verse-list {
+		max-height: 300px;
+		overflow-y: auto;
+		padding: 0;
+		list-style: none;
+		margin: 20px 0;
+	}
+
+	.modal-verse-item button {
+		all: unset;
+		cursor: pointer;
+		display: block;
+		width: 100%;
+		padding: 8px;
+		margin-bottom: 5px;
+		background-color: #f8f9fa;
+		border: 1px solid #dee2e6;
+		border-radius: 4px;
+	}
+	.modal-verse-item button:hover {
+		background-color: #e9ecef;
+	}
+
+	.close-btn {
+		margin-top: 20px;
+		padding: 10px 20px;
+		background-color: #dc3545;
+		color: white;
+		border: none;
+		border-radius: 5px;
+		cursor: pointer;
+	}
+	.close-btn:hover {
+		background-color: #c82333;
+	}
+	.sticky-actions {
+		position: sticky;
+		top: 5px;
+		z-index: 1000;
+		padding: 10px;
+	}
+
+	@media (max-width: 768px) {
+		.sticky-actions {
+			flex-wrap: wrap;
+			gap: 10px;
+			justify-content: center; /* Centra los botones de acciones en pantallas móviles */
+		}
+
+		.verse-btn {
+			text-align: center;
+		}
+
+		.modal-content {
+			padding: 15px;
+			font-size: 14px; /* Ajusta el tamaño de texto para pantallas más pequeñas */
+		}
+
+		.modal-verse-list {
+			max-width: auto;
+		}
+		.verse-list {
+			padding: 0 10px; /* Ajusta el padding para pantallas pequeñas */
+		}
+
+		.verse-btn {
+			text-align: center; /* Centra el texto para pantallas más pequeñas */
+			font-size: 14px; /* Ajusta el tamaño del texto */
+		}
+
+		.verse-item {
+			margin-bottom: 8px;
+		}
+	}
 </style>
-  
