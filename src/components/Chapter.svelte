@@ -157,7 +157,7 @@
 	{/if}
 
 	{#if chapterData && chapterData.vers?.length > 0}
-		<h3 class="text-center text-warning-emphasis">Capítulo {selectedChapter}</h3>
+		
 
 		{#if buttonsVisible && selectedVerses.length > 0}
 			<div id="actions" class="overflow-auto sticky-actions d-flex justify-content-center">
