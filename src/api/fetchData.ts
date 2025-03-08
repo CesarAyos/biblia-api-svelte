@@ -144,25 +144,51 @@ async function fetchAndCache<T>(key: string, url: string): Promise<T> {
 }
 
 // Función para obtener las versiones de la Biblia
+// fetchData.ts
 export async function fetchVersions(): Promise<Version[]> {
   const key = "bible_versions";
   const cachedData = await getFromIndexedDB(key);
+
   if (cachedData) {
     console.log(`Versiones obtenidas desde la caché (clave=${key})`);
     return cachedData;
   }
-  throw new Error("Las versiones no están disponibles en la caché.");
+
+  console.log(`Descargando versiones desde la API...`);
+  const url = `${CONFIG.apiBaseUrl}/versions`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Error al obtener versiones de la API: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  await saveToIndexedDB(key, data); // Guardar en IndexedDB
+  return data;
 }
 
 // Función para obtener los libros de una versión
+// fetchData.ts
 export async function fetchBooks(version: string): Promise<Book[]> {
   const key = `books_${version}`;
   const cachedData = await getFromIndexedDB(key);
+
   if (cachedData) {
     console.log(`Libros obtenidos desde la caché (clave=${key})`);
     return cachedData;
   }
-  throw new Error(`Los libros para la versión ${version} no están disponibles en la caché.`);
+
+  console.log(`Descargando libros para la versión ${version} desde la API...`);
+  const url = `${CONFIG.apiBaseUrl}/books?version=${version}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Error al obtener libros de la API: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  await saveToIndexedDB(key, data); // Guardar en IndexedDB
+  return data;
 }
 
 // Función para obtener un capítulo
@@ -313,7 +339,7 @@ async function downloadChaptersInParallel(
 // fetchData.ts
 export async function preloadFullBible(setProgress: (progress: number) => void): Promise<void> {
   try {
-    const versions = await fetchVersions();
+    const versions = await fetchVersions(); // Obtener versiones
     let totalChapters = 0;
 
     // Calcular el número total de capítulos
@@ -343,16 +369,17 @@ export async function preloadFullBible(setProgress: (progress: number) => void):
     console.log("Toda la Biblia ha sido descargada y almacenada en el caché.");
   } catch (error) {
     console.error("Error durante la precarga de la Biblia:", error);
-    throw error;
+    throw error; // Relanzar el error para manejarlo en initializeApp
   }
 }
 
 // Función para verificar si toda la Biblia está descargada
+// fetchData.ts
 export async function isBibleFullyDownloaded(): Promise<boolean> {
   try {
     const versions = await fetchVersions();
     for (const version of versions) {
-      const books = await fetchBooks(version.version);
+      const books = await fetchBooks(version.version); // Obtener libros
       for (const book of books) {
         for (let chapter = 1; chapter <= book.chapters; chapter++) {
           const cacheKey = `chapter_${version.version}_${book.abrev}_${chapter}`;

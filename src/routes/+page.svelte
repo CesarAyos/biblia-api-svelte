@@ -9,50 +9,40 @@
 		preloadFullBible,
 		isBibleFullyDownloaded,
 		validateDownloadComplete,
-		initializeApp // Añade esta línea
+		initializeApp
 	} from '../api/fetchData';
 	import type { Version, Book, SearchData } from '../api/fetchData';
 	import Chapter from '../components/Chapter.svelte';
 
 	// Variables principales
 	let versions: Version[] = [];
-	let selectedVersion: string | null = null;
-	let books: Book[] = [];
-	let selectedBook: string | null = null;
-	let bookDetails: Book | null = null;
-	let searchQuery: string = '';
-	let searchResults: SearchData | null = null;
-	let error: string | null = null;
-	let loadingSearch = false;
-	let currentPage = 0;
-	let progress = 0;
-	let loading = false;
-	let statusMessage = 'Haz clic en iniciar para comenzar la descarga';
-	let alreadyDownloaded = false;
+  let selectedVersion: string | null = null;
+  let books: Book[] = [];
+  let selectedBook: string | null = null;
+  let bookDetails: Book | null = null;
+  let searchQuery: string = '';
+  let searchResults: SearchData | null = null;
+  let error: string | null = null;
+  let loadingSearch = false;
+  let currentPage = 0;
+  let progress = 0;
+  let loading = false;
+  let statusMessage = '';
+  let alreadyDownloaded = false;
 
 	// Callback para actualizar el progreso
 	const setProgress = (value: number): void => {
-		progress = value;
-		console.log(`Progreso actual: ${progress}%`);
-	};
+    progress = value;
+    console.log(`Progreso actual: ${progress}%`);
+  };
 
-	// Verificar si ya se descargó al montar el componente
-	onMount(async () => {
-		const downloadState = localStorage.getItem('bibleDownloaded');
-		alreadyDownloaded = downloadState === 'true';
-		if (alreadyDownloaded) {
-			statusMessage = 'Disculpa por la espera!';
-		}
-
-		// Inicializar la aplicación
-		try {
-			await initializeApp(setProgress);
-			statusMessage = 'La aplicación está lista para usar sin conexión.';
-		} catch (err) {
-			error = `Error al inicializar la aplicación: ${(err as Error).message}`;
-			statusMessage = 'Error durante la inicialización. Intenta nuevamente.';
-		}
-	});
+  onMount(async () => {
+    const downloadState = localStorage.getItem('bibleDownloaded');
+    alreadyDownloaded = downloadState === 'true';
+    if (alreadyDownloaded) {
+      statusMessage = 'Disculpa por la espera!';
+    }
+  });
 
 	// Cargar las versiones disponibles al montar el componente
 	onMount(async () => {
@@ -85,6 +75,24 @@
 	$: if (selectedBook) {
 		bookDetails = books.find((book) => book.abrev === selectedBook) || null;
 	}
+
+	 // Función para iniciar la descarga
+	 async function startDownload() {
+    loading = true;
+    statusMessage = '';
+
+    try {
+      await initializeApp(setProgress); // Iniciar la descarga
+      statusMessage = '¡Descarga completa y validada!';
+      alreadyDownloaded = true;
+      localStorage.setItem('bibleDownloaded', 'true');
+    } catch (err) {
+      error = `Error durante la descarga: ${(err as Error).message}`;
+      statusMessage = 'Error durante la descarga. Intenta nuevamente.';
+    } finally {
+      loading = false;
+    }
+  }
 
 	// Función para realizar búsquedas
 	async function handleSearch() {
@@ -262,17 +270,15 @@
 
 	<div class="d-flex justify-content-center mb-4">
 		{#if !alreadyDownloaded}
-			<button on:click={simulateDownload} disabled={loading || alreadyDownloaded}>
-				{loading
-					? `Descargando... ${progress}%`
-					: alreadyDownloaded
-						? 'Descarga completada'
-						: 'Iniciar descarga'}
-			</button>
-
-			{#if error}
-				<p style="color: red;">{error}</p>
-			{/if}
+			
+		<button class="btn btn-warning" on:click={startDownload} disabled={loading || alreadyDownloaded}>
+			{loading ? `Descargando... ${progress}%` : alreadyDownloaded ? 'Descarga completada' : 'Iniciar descarga'}
+		  </button>
+		  
+		  <!-- Mensajes de estado y error -->
+		  {#if error}
+			<p style="color: red;">{error}</p>
+		  {/if}
 
 			<p>{statusMessage}</p>
 		{:else}
