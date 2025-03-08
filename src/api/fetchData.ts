@@ -156,8 +156,14 @@ export async function fetchBooks(version: string): Promise<Book[]> {
 // Función para obtener un capítulo
 export async function fetchChapter(version: string, book: string, chapter: number): Promise<ChapterData> {
   const url = `${CONFIG.apiBaseUrl}/read/${version}/${book}/${chapter}`;
-  return fetchAndCache<ChapterData>(`chapter_${version}_${book}_${chapter}`, url);
+  const data = await fetchAndCache<ChapterData>(`chapter_${version}_${book}_${chapter}`, url);
+
+  // Guardar versículos individuales en IndexedDB
+  await saveChapterToIndexedDB(`chapter_${version}_${book}_${chapter}`, data.vers);
+
+  return data;
 }
+
 
 // Función para realizar búsquedas
 export async function fetchSearch(version: string, query: string, take: number = 10, page: number = 1): Promise<SearchData> {
@@ -222,4 +228,32 @@ export async function isBibleFullyDownloaded(): Promise<boolean> {
 
   console.log("La Biblia está completamente descargada y almacenada.");
   return true;
+}
+
+// Guarda cada versículo como un elemento individual
+async function saveChapterToIndexedDB(chapterKey: string, verses: any[]): Promise<void> {
+  try {
+    const db = await openDatabase();
+    const transaction = db.transaction(CONFIG.cacheObjectStore, "readwrite");
+    const store = transaction.objectStore(CONFIG.cacheObjectStore);
+
+    for (const verse of verses) {
+      const key = `${chapterKey}_verse_${verse.number}`;
+      store.put({ key, data: verse, timestamp: Date.now() });
+    }
+
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => {
+        console.log(`Capítulo completo guardado con versículos individuales: ${chapterKey}`);
+        resolve();
+      };
+      transaction.onerror = () => {
+        console.error("Error en la transacción de IndexedDB:", transaction.error);
+        reject(transaction.error);
+      };
+    });
+  } catch (error) {
+    console.error("Error inesperado al guardar versículos en IndexedDB:", error);
+    throw error;
+  }
 }
