@@ -1,230 +1,315 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import { fetchVersions, fetchBooks, fetchSearch } from '../api/fetchData.js';
-    import type { Version, Book, SearchData } from '../api/fetchData.js';
-    import Chapter from '../components/Chapter.svelte';
+	import { onMount } from 'svelte';
+	import { fetchVersions, fetchBooks, fetchSearch, preloadFullBible } from '../api/fetchData.js';
+	import type { Version, Book, SearchData } from '../api/fetchData.js';
+	import Chapter from '../components/Chapter.svelte';
 
-    // Variables principales
-    let versions: Version[] = [];
-    let selectedVersion: string | null = null; // La versión seleccionada
-    let books: Book[] = [];
-    let selectedBook: string | null = null; // El libro seleccionado
-    let bookDetails: Book | null = null; // Detalles del libro seleccionado
-    let searchQuery: string = ''; // Consulta de búsqueda
-    let searchResults: SearchData | null = null; // Resultados de búsqueda
-    let error: string | null = null; // Mensaje de error
-    let loadingSearch = false; // Estado de carga
-    let currentPage = 0; // Página actual de búsqueda
+	// Variables principales
+	let versions: Version[] = [];
+	let selectedVersion: string | null = null; // Versión seleccionada
+	let books: Book[] = [];
+	let selectedBook: string | null = null; // Libro seleccionado
+	let bookDetails: Book | null = null; // Detalles del libro seleccionado
+	let searchQuery: string = ''; // Consulta de búsqueda
+	let searchResults: SearchData | null = null; // Resultados de búsqueda
+	let error: string | null = null; // Mensaje de error
+	let loadingSearch = false; // Estado de carga
+	let currentPage = 0; // Página actual de búsqueda
+	let progress = 0; // Progreso inicial
+	let loading = false; // Estado de carga
+	let statusMessage = 'Haz clic en iniciar para comenzar la descarga';
+	let alreadyDownloaded = false; // Estado para verificar si ya se descargó
 
-    // Cargar las versiones al montar el componente
-    onMount(async () => {
-        try {
-            error = null; // Reiniciar error
-            versions = await fetchVersions();
-        } catch (err) {
-            error = (err as Error).message;
-        }
-    });
+	// Verificar si ya se descargó al montar el componente
+	onMount(() => {
+		const downloadState = localStorage.getItem('bibleDownloaded');
+		alreadyDownloaded = downloadState === 'true';
 
-    // Función para cargar los libros según la versión seleccionada
-    async function loadBooks() {
-        if (!selectedVersion) {
-            error = 'Por favor, selecciona una versión válida.';
-            return;
-        }
+		if (alreadyDownloaded) {
+			statusMessage = '¡La Biblia ya está descargada!';
+		}
+	});
 
-        try {
-            error = null; // Limpiar errores
-            books = await fetchBooks(selectedVersion);
-            selectedBook = null;
-            bookDetails = null;
-        } catch (err) {
-            error = (err as Error).message;
-        }
-    }
+	// Cargar las versiones disponibles al montar el componente
+	onMount(async () => {
+		try {
+			error = null; // Reiniciar errores
+			versions = await fetchVersions();
+		} catch (err) {
+			error = `Error al cargar versiones: ${(err as Error).message}`;
+		}
+	});
 
-    // Actualizar detalles del libro seleccionado
-    $: if (selectedBook) {
-        bookDetails = books.find((book) => book.abrev === selectedBook) || null;
-    }
+	// Función para cargar los libros según la versión seleccionada
+	async function loadBooks() {
+		if (!selectedVersion) {
+			error = 'Por favor, selecciona una versión válida.';
+			return;
+		}
 
-    // Función para realizar búsquedas
-    async function handleSearch() {
-        if (!searchQuery.trim() || !selectedVersion) {
-            alert('Por favor, selecciona una versión y escribe un término de búsqueda.');
-            return;
-        }
+		try {
+			error = null; // Limpiar errores
+			books = await fetchBooks(selectedVersion);
+			selectedBook = null;
+			bookDetails = null;
+		} catch (err) {
+			error = `Error al cargar libros: ${(err as Error).message}`;
+		}
+	}
 
-        try {
-            loadingSearch = true; // Mostrar el estado de carga
-            searchResults = { data: [], total: 0, page: 1, take: 100 };
-            currentPage = 0; // Reiniciar progreso
+	// Actualizar detalles del libro seleccionado
+	$: if (selectedBook) {
+		bookDetails = books.find((book) => book.abrev === selectedBook) || null;
+	}
 
-            const totalPages = 50; // Límite de páginas
-            const promises = Array.from({ length: totalPages }, (_, index) => {
-                const page = index + 1; // Página actual
-                return fetchSearch(selectedVersion!, searchQuery, 100, page);
-            });
+	// Función para realizar búsquedas
+	async function handleSearch() {
+		if (!searchQuery.trim() || !selectedVersion) {
+			alert('Por favor, selecciona una versión y escribe un término de búsqueda.');
+			return;
+		}
 
-            const responses = await Promise.all(promises);
+		try {
+			loadingSearch = true;
+			searchResults = { data: [], total: 0, page: 1, take: 100 };
+			currentPage = 0;
 
-            responses.forEach((response, index) => {
-                currentPage = index + 1; // Actualizar la página actual
-                if (response.data.length > 0) {
-                    searchResults!.data.push(...response.data); // Agregar resultados
-                }
-            });
-        } catch (err) {
-            error = `Error al realizar la búsqueda: ${(err as Error).message}`;
-        } finally {
-            loadingSearch = false; // Terminar el estado de carga
-        }
-    }
+			const totalPages = 50; // Límite arbitrario de páginas
+			const promises = Array.from({ length: totalPages }, (_, index) => {
+				const page = index + 1; // Página actual
+				return fetchSearch(selectedVersion!, searchQuery, 100, page);
+			});
+
+			const responses = await Promise.all(promises);
+
+			responses.forEach((response, index) => {
+				currentPage = index + 1; // Actualizar la página actual
+				if (response.data.length > 0) {
+					searchResults!.data.push(...response.data); // Agregar resultados
+				}
+			});
+		} catch (err) {
+			error = `Error al realizar la búsqueda: ${(err as Error).message}`;
+		} finally {
+			loadingSearch = false; // Finalizar la carga
+		}
+	}
+
+	// Función para simular la descarga de la Biblia
+	async function simulateDownload() {
+		if (alreadyDownloaded) {
+			statusMessage = '¡La Biblia ya está descargada!';
+			return;
+		}
+
+		loading = true;
+		progress = 0;
+		statusMessage = 'Iniciando descarga...';
+
+		// Simulación del progreso del 0 al 100%
+		while (progress < 100) {
+			await new Promise((resolve) => setTimeout(resolve, 50)); // Espera 50 ms
+			progress += 1; // Incrementa el progreso
+			statusMessage = `Descargando... ${progress}%`;
+		}
+
+		// Descarga completada
+		statusMessage = '¡Descarga completa!';
+		loading = false;
+		alreadyDownloaded = true;
+
+		// Guardar el estado en localStorage
+		localStorage.setItem('bibleDownloaded', 'true');
+	}
 </script>
 
-
 <!-- Barra de navegación -->
-<nav class="navbar navbar-expand-lg bg-light"> 
-    <div class="container-fluid">
-        <h1 class="text-center text-warning-emphasis">BIBLIA <strong>{selectedVersion || ''}</strong></h1>
-        <button
-            class="navbar-toggler"
-            type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent"
-            aria-expanded="false"
-            aria-label="Toggle navigation"
-        >
-            <span class="navbar-toggler-icon"></span>
-        </button>
 
-        <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                <!-- Selector de versiones -->
-                <li class="nav-item">
-                    <div class="d-flex justify-content-center p-4">
-                        {#if error}
-                            <p style="color: red;">Error: {error}</p>
-                        {:else}
-                            <label class="text-warning-emphasis">
-                                SELECCIONA UNA VERSIÓN: <br />
-                                <select bind:value={selectedVersion} on:change={loadBooks}>
-                                    <option value="" disabled selected>Elige una versión</option>
-                                    {#each versions as version}
-                                        <option class="text-warning-emphasis" value={version.version}>{version.name}</option>
-                                    {/each}
-                                </select>
-                            </label>
-                        {/if}
-                    </div>
-                </li>
+<nav class="navbar navbar-expand-lg bg-dark shadow">
+	<div class="container-fluid">
+		<!-- Logo or Title -->
+		<p class="navbar-brand text-warning-emphasis fs-3 fw-bold">
+			<i class="bi bi-book"></i> Biblia <strong>{selectedVersion || ''}</strong>
+		</p>
+		<!-- Mobile Toggle Button -->
+		<button
+			class="navbar-toggler border-warning"
+			type="button"
+			data-bs-toggle="collapse"
+			data-bs-target="#navbarSupportedContent"
+			aria-controls="navbarSupportedContent"
+			aria-expanded="false"
+			aria-label="Toggle navigation"
+		>
+			<span class="navbar-toggler-icon text-warning"></span>
+		</button>
 
-                <!-- Selector de libros -->
-                <li class="nav-item">
-                    <div class="d-flex justify-content-center p-4">
-                        {#if selectedVersion && books.length > 0}
-                            <label class="text-warning-emphasis">
-                                SELECCIONA UN LIBRO: <br />
-                                <select bind:value={selectedBook}>
-                                    <option value="" disabled selected>Elige un libro</option>
-                                    {#each books as book}
-                                        <option class="text-warning-emphasis" value={book.abrev}>{book.names[0]}</option>
-                                    {/each}
-                                </select>
-                            </label>
-                        {:else if selectedVersion}
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div class="spinner-border text-secondary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div class="spinner-border text-success" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div class="spinner-border text-danger" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div class="spinner-border text-warning" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div class="spinner-border text-info" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div class="spinner-border text-light" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div class="spinner-border text-dark" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        {/if}
-                    </div>
-                </li>
-            </ul>
+		<!-- Navbar Content -->
+		<div class="collapse navbar-collapse" id="navbarSupportedContent">
+			<ul class="navbar-nav me-auto mb-2 mb-lg-0">
+				<!-- Version Selector -->
+				<li class="nav-item dropdown">
+					<button
+						class="nav-link dropdown-toggle text-warning-emphasis fw-bold"
+						id="versionDropdown"
+						data-bs-toggle="dropdown"
+						aria-expanded="false"
+					>
+						Selecciona Versión
+					</button>
+					<ul class="dropdown-menu">
+						{#if error}
+							<li>
+								<p style="color: red;" class="dropdown-item">Error: {error}</p>
+							</li>
+						{:else}
+							{#each versions as version}
+								<li>
+									<button
+										class="dropdown-item text-warning-emphasis"
+										value={version.version}
+										on:click={() => {
+											selectedVersion = version.version;
+											loadBooks();
+										}}
+									>
+										{version.name}
+									</button>
+								</li>
+							{/each}
+						{/if}
+					</ul>
+				</li>
 
-            <!-- Barra de búsqueda -->
-            <div class="d-flex justify-content-center">
-                <input type="text" placeholder="Buscar" bind:value={searchQuery} />
-                <button on:click={handleSearch} class="btn btn-warning">Buscar</button>
-            </div>
-        </div>
-    </div>
+				<!-- Book Selector -->
+				<li class="nav-item">
+					<div class="d-flex align-items-center">
+						{#if selectedVersion && books.length > 0}
+							<p class="text-warning-emphasis me-2"> Libro: </p>
+							<select
+								class="form-select form-select-sm bg-dark text-warning-emphasis border-warning"
+								bind:value={selectedBook}
+							>
+								<option value="" disabled selected>Elige un libro</option>
+								{#each books as book}
+									<option value={book.abrev}>{book.names[0]}</option>
+								{/each}
+							</select>
+						{:else}
+							<span class="spinner-border text-warning spinner-border-sm" role="status"></span>
+						{/if}
+					</div>
+				</li>
+			</ul>
+
+			<!-- Search Bar -->
+			<form class="d-flex">
+				<input
+					class="form-control me-2 bg-dark text-warning-emphasis border-warning"
+					type="search"
+					placeholder="Buscar"
+					aria-label="Search"
+					bind:value={searchQuery}
+				/>
+				<button class="btn btn-outline-warning" type="button" on:click={handleSearch}>
+					<i class="bi bi-search"></i> Buscar
+				</button>
+			</form>
+		</div>
+	</div>
 </nav>
 
 <!-- Mensaje de bienvenida -->
 {#if !selectedVersion && !selectedBook && !searchResults}
-    <div class="text-center mt-5 p-4 text-warning-emphasis">
-        <h2>Bienvenidos a la Biblia Interactiva</h2>
-        <p>Por favor, selecciona una versión o busca un versículo para comenzar.</p>
-    </div>
+	<div class="text-center mt-5 p-4 text-warning-emphasis">
+		<h2>Bienvenidos a la Biblia Interactiva</h2>
+		<p>Por favor, selecciona una versión o busca un versículo para comenzar.</p>
+	</div>
+
+	<h4 class="text-center mt-5 p-4 text-warning-emphasis">
+		Si le das Descagar, se guardara en tu cache para que puedas usar la app de manera offline
+	</h4>
+	<p class="text-center mt-5 p-4 text-warning-emphasis">{statusMessage}</p>
+
+	<!-- Mostrar el botón solo si no se ha descargado -->
+	<div class="d-flex justify-content-center mb-4">
+		{#if !alreadyDownloaded}
+			<button
+				type="button"
+				class="btn btn-outline-warning"
+				on:click={simulateDownload}
+				disabled={loading}
+			>
+				{loading ? 'Cargando...' : 'Iniciar descarga'}
+			</button>
+		{/if}
+	</div>
+
+	<!-- Barra de Progreso -->
+	{#if loading}
+		<div class="progress-container"></div>
+
+		<div
+			class="progress"
+			role="progressbar"
+			aria-label="Warning example"
+			aria-valuenow="100"
+			aria-valuemin="0"
+			aria-valuemax="100"
+		>
+			<div class="progress-bar" style="width: {progress}%;">{progress}%</div>
+		</div>
+	{/if}
 {/if}
 
 {#if selectedBook && bookDetails && selectedVersion}
-    <Chapter {selectedBook} {selectedVersion} {bookDetails} />
+	<Chapter {selectedBook} {selectedVersion} {bookDetails} />
 {/if}
 
 <!-- Resultados y mensajes -->
 <main>
-    <div class="resultados">
-        {#if loadingSearch}
-            <div class="d-flex justify-content-center" style="margin-top: 200px;">
-                <div class="spinner-grow text-primary m-2" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <div class="spinner-grow text-secondary m-2" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <div class="spinner-grow text-success m-2" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <div class="spinner-grow text-danger m-2" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <div class="spinner-grow text-warning m-2" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <div class="spinner-grow text-info m-2" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <div class="spinner-grow text-light m-2" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <div class="spinner-grow text-dark m-2" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-        {:else if searchResults && searchResults.data.length > 0}
-            <h3 class="text-warning-emphasis">Resultados de la búsqueda:</h3>
-            <ul>
-                {#each searchResults.data as result}
-                    <li class="versiculo text-white">
-                        <strong class="text-warning-emphasis">{result.book} {result.chapter}:{result.number}</strong> - {result.verse}
-                    </li>
-                {/each}
-            </ul>
-        {:else if searchQuery && searchResults && searchResults.data.length === 0}
-            <p>No se encontraron resultados para "{searchQuery}".</p>
-        {/if}
-    </div>
+	<div class="resultados">
+		{#if loadingSearch}
+			<div class="d-flex justify-content-center" style="margin-top: 200px;">
+				<div class="spinner-grow text-primary m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-secondary m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-success m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-danger m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-warning m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-info m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-light m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+				<div class="spinner-grow text-dark m-2" role="status">
+					<span class="visually-hidden">Loading...</span>
+				</div>
+			</div>
+		{:else if searchResults && searchResults.data.length > 0}
+			<h3 class="text-warning-emphasis">Resultados de la búsqueda:</h3>
+			<ul>
+				{#each searchResults.data as result}
+					<li class="versiculo text-white">
+						<strong class="text-warning-emphasis"
+							>{result.book} {result.chapter}:{result.number}</strong
+						>
+						- {result.verse}
+					</li>
+				{/each}
+			</ul>
+		{:else if searchQuery && searchResults && searchResults.data.length === 0}
+			<p>No se encontraron resultados para "{searchQuery}".</p>
+		{/if}
+	</div>
 </main>
