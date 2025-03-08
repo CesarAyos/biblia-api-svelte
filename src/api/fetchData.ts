@@ -57,6 +57,12 @@ export type SearchData = {
 // Función para abrir la base de datos de IndexedDB
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    // Verificar si estamos en el navegador
+    if (typeof window === "undefined" || !window.indexedDB) {
+      reject(new Error("indexedDB no está disponible en este entorno."));
+      return;
+    }
+
     const request = indexedDB.open(CONFIG.dbName, 1);
 
     request.onupgradeneeded = (event) => {
@@ -78,7 +84,6 @@ async function saveToIndexedDB(key: string, data: any): Promise<void> {
     const db = await openDatabase();
     const transaction = db.transaction(CONFIG.cacheObjectStore, "readwrite");
     const store = transaction.objectStore(CONFIG.cacheObjectStore);
-    const request = store.put({ key, data, timestamp: Date.now() });
 
     return new Promise((resolve, reject) => {
       transaction.oncomplete = () => {
@@ -89,10 +94,7 @@ async function saveToIndexedDB(key: string, data: any): Promise<void> {
         console.error("Error en la transacción de IndexedDB:", transaction.error);
         reject(transaction.error);
       };
-      request.onerror = () => {
-        console.error("Error guardando en IndexedDB:", request.error);
-        reject(request.error);
-      };
+      store.put({ key, data, timestamp: Date.now() });
     });
   } catch (error) {
     console.error("Error inesperado guardando en IndexedDB:", error);
@@ -101,24 +103,24 @@ async function saveToIndexedDB(key: string, data: any): Promise<void> {
 }
 
 // Función para recuperar datos de IndexedDB
-async function getFromIndexedDB(key: string): Promise<any | null> {
+export async function getFromIndexedDB(key: string): Promise<any | null> {
   try {
     const db = await openDatabase();
     const transaction = db.transaction(CONFIG.cacheObjectStore, "readonly");
     const store = transaction.objectStore(CONFIG.cacheObjectStore);
-    const request = store.get(key);
 
     return new Promise((resolve, reject) => {
+      const request = store.get(key);
+
       request.onsuccess = () => {
         console.log(`Recuperado de IndexedDB (clave=${key}):`, request.result);
-        resolve(request.result ? request.result.data : null); // Devuelve solo los datos
+        resolve(request.result ? request.result.data : null);
       };
-
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
-    console.error("Error recuperando de IndexedDB:", error);
-    throw error;
+    console.error(`Error recuperando de IndexedDB con clave=${key}:`, error);
+    return null;
   }
 }
 
@@ -164,7 +166,6 @@ export async function fetchChapter(version: string, book: string, chapter: numbe
   return data;
 }
 
-
 // Función para realizar búsquedas
 export async function fetchSearch(version: string, query: string, take: number = 10, page: number = 1): Promise<SearchData> {
   if (!version || !query) {
@@ -181,56 +182,7 @@ export async function fetchSearch(version: string, query: string, take: number =
   return await response.json();
 }
 
-// Función principal para cargar toda la Biblia en IndexedDB
-export async function preloadFullBible(): Promise<void> {
-  const versions = await fetchVersions();
-
-  for (const version of versions) {
-    console.log(`Descargando libros para la versión: ${version.name}`);
-    const books = await fetchBooks(version.version);
-
-    for (const book of books) {
-      console.log(`Descargando capítulos para el libro: ${book.abrev}`);
-
-      for (let chapter = 1; chapter <= book.chapters; chapter++) {
-        try {
-          await fetchChapter(version.version, book.abrev, chapter);
-          console.log(`Capítulo guardado: ${version.version} - ${book.abrev} - Capítulo ${chapter}`);
-        } catch (error) {
-          console.error(`Error al descargar el capítulo ${chapter} del libro ${book.abrev}:`, error);
-        }
-      }
-    }
-  }
-
-  console.log("Toda la Biblia ha sido precargada y almacenada en IndexedDB.");
-}
-
-// Función para verificar si toda la Biblia está descargada
-export async function isBibleFullyDownloaded(): Promise<boolean> {
-  const versions = await fetchVersions();
-
-  for (const version of versions) {
-    const books = await fetchBooks(version.version);
-
-    for (const book of books) {
-      for (let chapter = 1; chapter <= book.chapters; chapter++) {
-        const cacheKey = `chapter_${version.version}_${book.abrev}_${chapter}`;
-        const cachedData = await getFromIndexedDB(cacheKey);
-
-        if (!cachedData) {
-          console.warn(`Falta el capítulo ${chapter} del libro ${book.abrev} en la versión ${version.version}`);
-          return false;
-        }
-      }
-    }
-  }
-
-  console.log("La Biblia está completamente descargada y almacenada.");
-  return true;
-}
-
-// Guarda cada versículo como un elemento individual
+// Función para guardar capítulos en IndexedDB
 async function saveChapterToIndexedDB(chapterKey: string, verses: any[]): Promise<void> {
   try {
     const db = await openDatabase();
@@ -257,3 +209,156 @@ async function saveChapterToIndexedDB(chapterKey: string, verses: any[]): Promis
     throw error;
   }
 }
+
+// Función para descargar múltiples capítulos en paralelo con límite de concurrencia
+async function downloadChaptersInParallel(version: string, book: Book, concurrencyLimit: number = 5): Promise<void> {
+  const chaptersToDownload = Array.from({ length: book.chapters }, (_, i) => i + 1);
+
+  // Función para descargar un capítulo específico
+  const downloadChapter = async (chapter: number): Promise<void> => {
+    const cacheKey = `chapter_${version}_${book.abrev}_${chapter}`;
+    const cachedData = await getFromIndexedDB(cacheKey);
+
+    if (!cachedData) {
+      try {
+        await fetchChapter(version, book.abrev, chapter);
+        console.log(`Guardado capítulo ${chapter} del libro ${book.abrev} (${version})`);
+      } catch (error) {
+        console.error(`Error al guardar el capítulo ${chapter} del libro ${book.abrev}:`, error);
+      }
+    }
+  };
+
+  // Función para manejar la concurrencia
+  const runWithConcurrency = async (tasks: (() => Promise<void>)[], limit: number): Promise<void> => {
+    const executing = new Set<Promise<void>>(); // Set de promesas en ejecución
+
+    for (const task of tasks) {
+      // Crear una promesa que se resuelve cuando la tarea termina
+      const promise = task().then(() => {
+        executing.delete(promise); // Eliminar la promesa del conjunto cuando termine
+      });
+
+      executing.add(promise); // Añadir la promesa al conjunto
+
+      // Si se alcanza el límite de concurrencia, esperar a que alguna promesa termine
+      if (executing.size >= limit) {
+        await Promise.race(executing); // Esperar a que la primera promesa termine
+      }
+    }
+
+    // Esperar a que todas las promesas restantes terminen
+    await Promise.all(executing);
+  };
+
+  // Crear tareas de descarga
+  const tasks = chaptersToDownload.map(chapter => () => downloadChapter(chapter));
+
+  // Ejecutar tareas con límite de concurrencia
+  await runWithConcurrency(tasks, concurrencyLimit);
+}
+
+// Función para precargar toda la Biblia con paralelismo
+export async function preloadFullBible(setProgress: (progress: number) => void): Promise<void> {
+  try {
+    const versions = await fetchVersions();
+    let totalChapters = 0;
+
+    // Calcular el número total de capítulos
+    for (const version of versions) {
+      const books = await fetchBooks(version.version);
+      for (const book of books) {
+        totalChapters += book.chapters;
+      }
+    }
+
+    let currentChapter = 0;
+
+    // Descargar y guardar cada capítulo en paralelo
+    for (const version of versions) {
+      const books = await fetchBooks(version.version);
+
+      for (const book of books) {
+        await downloadChaptersInParallel(version.version, book);
+
+        // Actualizar progreso
+        currentChapter += book.chapters;
+        const progress = Math.floor((currentChapter / totalChapters) * 100);
+        setProgress(progress); // Llamada al callback para actualizar el progreso
+      }
+    }
+
+    console.log("Toda la Biblia ha sido descargada y almacenada en el caché.");
+  } catch (error) {
+    console.error("Error durante la precarga de la Biblia:", error);
+  }
+}
+
+// Función para verificar si toda la Biblia está descargada
+export async function isBibleFullyDownloaded(): Promise<boolean> {
+  try {
+    const versions = await fetchVersions();
+    for (const version of versions) {
+      const books = await fetchBooks(version.version);
+      for (const book of books) {
+        for (let chapter = 1; chapter <= book.chapters; chapter++) {
+          const cacheKey = `chapter_${version.version}_${book.abrev}_${chapter}`;
+          const cachedData = await getFromIndexedDB(cacheKey);
+          if (!cachedData) {
+            console.warn(`Falta el capítulo ${chapter} del libro ${book.abrev} en la versión ${version.version}`);
+            return false;
+          }
+        }
+      }
+    }
+    console.log("La Biblia está completamente descargada y almacenada.");
+    return true;
+  } catch (error) {
+    console.error("Error al verificar si la Biblia está descargada:", error);
+    return false;
+  }
+}
+
+// Función para inicializar la aplicación
+export async function initializeApp(): Promise<void> {
+  console.log("Iniciando la aplicación y precargando la Biblia...");
+
+  // Progreso inicializado
+  let progress = 0;
+
+  // Callback para actualizar el progreso
+  const setProgress = (value: number): void => {
+    progress = value;
+    console.log(`Progreso actual: ${progress}%`);
+  };
+
+  // Llamada a preloadFullBible con el callback
+  await preloadFullBible(setProgress);
+
+  // Verificar que toda la Biblia se descargó correctamente
+  const isComplete = await isBibleFullyDownloaded();
+  if (isComplete) {
+    console.log("Toda la Biblia está descargada y lista.");
+  } else {
+    console.warn("La descarga terminó, pero algunos datos pueden faltar.");
+  }
+
+  console.log("Aplicación lista.");
+}
+
+
+export async function validateDownloadComplete(): Promise<boolean> {
+  try {
+    const isComplete = await isBibleFullyDownloaded(); // Verifica si todos los datos están en IndexedDB
+    if (isComplete) {
+      console.log("Validación completa: Toda la Biblia está descargada.");
+    } else {
+      console.warn("Faltan algunos capítulos. Verifica los datos.");
+    }
+    return isComplete;
+  } catch (error) {
+    console.error("Error al validar la descarga:", error);
+    return false;
+  }
+}
+
