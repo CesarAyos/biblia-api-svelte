@@ -2,6 +2,13 @@
 	import { fetchChapter } from '../api/fetchData.js';
 	import type { ChapterData, Book } from '../api/fetchData.js';
 
+	// Define un tipo para los versículos marcados
+	type MarkedVerse = {
+		number: number;
+		text: string;
+		color?: string;
+	};
+
 	export let selectedBook: string;
 	export let selectedVersion: string;
 	export let bookDetails: Book | null = null;
@@ -10,17 +17,34 @@
 	let isLoading = false;
 	let error: string | null = null;
 	let feedbackMessage: string | null = null;
-	let selectedVerses: { number: number; text: string }[] = [];
-	let showModal = false; // Controla la visibilidad del modal
+	let selectedVerses: MarkedVerse[] = [];
+	let showModal = false;
 	let buttonsEnabled = false;
-	let buttonsVisible = false; // Controla la visibilidad de los botones
-	let selectionTimeout: number | null = null; // Referencia al temporizador
+	let buttonsVisible = false;
+	let selectionTimeout: number | null = null;
+	let selectedColor: string | null = null;
+	let showColorPicker = false;
+
+	const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF'];
+
+	// Cargar versículos marcados desde localStorage
+	function loadMarkedVerses() {
+		const storedVerses = localStorage.getItem(`markedVerses-${selectedBook}-${selectedChapter}`);
+		if (storedVerses) {
+			selectedVerses = JSON.parse(storedVerses);
+		}
+	}
+
+	// Guardar versículos marcados en localStorage
+	function saveMarkedVerses() {
+		localStorage.setItem(`markedVerses-${selectedBook}-${selectedChapter}`, JSON.stringify(selectedVerses));
+	}
 
 	function goToVerse(verseNumber: number) {
 		const verseElement = document.getElementById(`verse-${verseNumber}`);
 		if (verseElement) {
-			verseElement.scrollIntoView({ behavior: 'smooth' }); // Desplázate suavemente
-			closeModal(); // Cierra el modal después de desplazarse
+			verseElement.scrollIntoView({ behavior: 'smooth' });
+			closeModal();
 		} else {
 			console.error(`El versículo ${verseNumber} no se encontró.`);
 		}
@@ -44,7 +68,7 @@
 				selectedBook.toLowerCase(),
 				selectedChapter
 			);
-			// Abre el modal tras cargar los datos del capítulo
+			loadMarkedVerses(); // Cargar versículos marcados al cargar el capítulo
 			showModal = true;
 		} catch (err) {
 			const errorObj = err as Error;
@@ -55,28 +79,35 @@
 	}
 
 	function toggleVerseSelection(verseNumber: number, verseText: string) {
+		if (!selectedColor) {
+			feedbackMessage = 'Selecciona un color antes de marcar un versículo.';
+			setTimeout(() => (feedbackMessage = null), 3000);
+			return;
+		}
+
 		const index = selectedVerses.findIndex((v) => v.number === verseNumber);
 
 		if (index >= 0) {
 			selectedVerses.splice(index, 1);
 			selectedVerses = [...selectedVerses];
-			buttonsVisible = selectedVerses.length > 0; // Actualiza visibilidad solo si hay versículos seleccionados
-			if (selectionTimeout) clearTimeout(selectionTimeout); // Limpia el temporizador
+			buttonsVisible = selectedVerses.length > 0;
+			if (selectionTimeout) clearTimeout(selectionTimeout);
 		} else {
-			selectedVerses.push({ number: verseNumber, text: verseText });
+			selectedVerses.push({ number: verseNumber, text: verseText, color: selectedColor });
 			selectedVerses = [...selectedVerses];
 
-			buttonsVisible = false; // Oculta botones inicialmente
-			if (selectionTimeout) clearTimeout(selectionTimeout); // Resetea temporizador previo
+			buttonsVisible = false;
+			if (selectionTimeout) clearTimeout(selectionTimeout);
 			selectionTimeout = window.setTimeout(() => {
-				buttonsVisible = true; // Muestra botones tras 1 segundo
-			}, 1000); // 1000 ms = 1 segundo
+				buttonsVisible = true;
+			}, 1000);
 		}
+
+		saveMarkedVerses(); // Guardar versículos marcados
 	}
 
 	function copySelectedVerses() {
 		if (selectedVerses.length > 0) {
-			// Retraso de 1 segundo antes de ejecutar la lógica de copiar
 			setTimeout(() => {
 				const textToCopy = selectedVerses
 					.map(
@@ -88,18 +119,17 @@
 					.join('\n');
 				navigator.clipboard.writeText(textToCopy).then(() => {
 					feedbackMessage = 'Texto copiado al portapapeles.';
-					setTimeout(() => (feedbackMessage = null), 3000); // Mensaje temporal
+					setTimeout(() => (feedbackMessage = null), 3000);
 				});
-			}, 1000); // Retraso de 1 segundo
+			}, 1000);
 		} else {
 			feedbackMessage = 'Selecciona al menos un versículo para copiar.';
-			setTimeout(() => (feedbackMessage = null), 3000); // Mensaje temporal
+			setTimeout(() => (feedbackMessage = null), 3000);
 		}
 	}
 
 	function shareSelectedVersesViaWhatsApp() {
 		if (selectedVerses.length > 0) {
-			// Retraso de 1 segundo antes de ejecutar la lógica de compartir
 			setTimeout(() => {
 				const textToShare = selectedVerses
 					.map(
@@ -111,15 +141,21 @@
 					.join('\n');
 				const shareURL = `https://wa.me/?text=${encodeURIComponent(textToShare)}`;
 				window.open(shareURL, '_blank');
-			}, 1000); // Retraso de 1 segundo
+			}, 1000);
 		} else {
 			feedbackMessage = 'Selecciona al menos un versículo para compartir.';
-			setTimeout(() => (feedbackMessage = null), 3000); // Mensaje temporal
+			setTimeout(() => (feedbackMessage = null), 3000);
 		}
 	}
 
 	function closeModal() {
 		showModal = false;
+	}
+
+	// Seleccionar un color
+	function selectColor(color: string) {
+		selectedColor = color;
+		showColorPicker = false; // Oculta el selector de colores después de seleccionar uno
 	}
 </script>
 
@@ -157,8 +193,6 @@
 	{/if}
 
 	{#if chapterData && chapterData.vers?.length > 0}
-		
-
 		{#if buttonsVisible && selectedVerses.length > 0}
 			<div id="actions" class="overflow-auto sticky-actions d-flex justify-content-center">
 				<button on:click={copySelectedVerses} class="btn btn-primary">Copiar</button>
@@ -175,6 +209,8 @@
 						class="verse-btn {selectedVerses.find((v) => v.number === verse.number)
 							? 'selected'
 							: ''}"
+						style:background-color={selectedVerses.find((v) => v.number === verse.number)?.color ||
+							'transparent'}
 						on:click={() => toggleVerseSelection(verse.number, verse.verse)}
 					>
 						<strong class="verse-number">{verse.number}:</strong>
@@ -184,6 +220,25 @@
 			{/each}
 		</ul>
 	{/if}
+
+	<!-- Botón flotante para seleccionar colores -->
+	<div class="floating-color-picker">
+		<button class="color-picker-btn" on:click={() => (showColorPicker = !showColorPicker)}>
+			🎨
+		</button>
+		{#if showColorPicker}
+			<div class="color-options">
+				{#each colors as color}
+					<button
+						class="color-option"
+						aria-label="Seleccionar color"
+						style:background-color={color}
+						on:click={() => selectColor(color)}
+					></button>
+				{/each}
+			</div>
+		{/if}
+	</div>
 
 	<!-- Modal -->
 	{#if showModal}
@@ -213,6 +268,44 @@
 </main>
 
 <style>
+	.floating-color-picker {
+		position: fixed;
+		bottom: 20px;
+		right: 20px;
+		z-index: 1000;
+		border-radius: 100%;
+	}
+
+	.color-picker-btn {
+		background-color: #ffffff;
+		border: 2px solid #000000;
+		border-radius: 50%;
+		width: 50px;
+		height: 50px;
+		font-size: 24px;
+		cursor: pointer;
+		box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+	}
+
+	.color-options {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		margin-top: 10px;
+	}
+
+	.color-option {
+		width: 40px;
+		height: 40px;
+		border-radius: 50%;
+		border: 2px solid #000000;
+		cursor: pointer;
+	}
+
+	.verse-btn.selected {
+		border: 2px solid #000000;
+	}
+
 	.chapter-dropdown {
 		padding: 10px;
 		margin: 0 auto;
