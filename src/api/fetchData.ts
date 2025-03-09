@@ -76,9 +76,19 @@ export async function fetchVersions(): Promise<Version[]> {
   // Eliminar el filtro para devolver todas las versiones
   return versions;
 }
-// Función para obtener los libros de una versión
+
 export async function fetchBooks(version: string): Promise<Book[]> {
-  return fetchFromAPI<Book[]>(`${CONFIG.apiBaseUrl}/books?version=${version}`);
+  try {
+    const response = await fetch(`${CONFIG.apiBaseUrl}/books?version=${version}`);
+    if (!response.ok) {
+      throw new Error(`Error al obtener libros: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Error al obtener libros para la versión ${version}:`, error);
+    throw error;
+  }
 }
 
 // Función para obtener un capítulo

@@ -23,23 +23,22 @@
 	// Callback para actualizar el progreso
 	const setProgress = (value: number): void => {
 	  progress = value;
-	  console.log(`Progreso actual: ${progress}%`);
 	};
   
-	// Cargar las versiones disponibles al montar el componente
+	// Carga de versiones al montar el componente
 	onMount(async () => {
-	  try {
-		loadingVersions = true;
-		versions = await fetchVersions();
-		console.log('Versiones cargadas:', versions);
-	  } catch (err) {
-		error = `Error al cargar versiones: ${(err as Error).message}`;
-		console.error(error);
-	  } finally {
-		loadingVersions = false;
-	  }
-	});
-  
+  try {
+    loadingVersions = true;
+    versions = await fetchVersions();
+    console.log('Versiones cargadas:', versions);
+  } catch (err) {
+    error = `Error al cargar versiones: ${(err as Error).message}`;
+    console.error(error);
+  } finally {
+    loadingVersions = false;
+  }
+});
+
 	// Cargar libros cuando se selecciona una versión
 	$: if (selectedVersion) {
 	  loadBooks(selectedVersion);
@@ -50,8 +49,7 @@
 		books = await fetchBooks(version);
 		console.log('Libros cargados:', books);
 	  } catch (err) {
-		error = `Error al cargar libros: ${(err as Error).message}`;
-		console.error(error);
+		
 	  }
 	}
   
@@ -76,8 +74,7 @@
 		searchResults.data = response.data;
 		searchResults.total = response.total;
 	  } catch (err) {
-		error = `Error al realizar la búsqueda: ${(err as Error).message}`;
-		console.error(error);
+		
 	  } finally {
 		loadingSearch = false;
 	  }
@@ -92,7 +89,6 @@
 		await preloadVersion(version, setProgress);
 		statusMessage = `Versión ${version} descargada correctamente.`;
 	  } catch (err) {
-		error = `Error al descargar la versión ${version}: ${(err as Error).message}`;
 		statusMessage = 'Error al descargar la versión.';
 		console.error(error);
 	  } finally {
@@ -108,64 +104,8 @@
 		<i class="bi bi-book"></i> Biblia <strong>{selectedVersion || ''}</strong>
 	  </p>
   
-	  <button
-		class="navbar-toggler border-warning"
-		type="button"
-		data-bs-toggle="collapse"
-		data-bs-target="#navbarSupportedContent"
-		aria-controls="navbarSupportedContent"
-		aria-expanded="false"
-		aria-label="Toggle navigation"
-	  >
-		<span class="navbar-toggler-icon text-warning"></span>
-	  </button>
-  
-	  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+	  <div class="collapse navbar-collapse">
 		<ul class="navbar-nav me-auto mb-2 mb-lg-0">
-		  <li class="nav-item dropdown">
-			<button
-			  class="nav-link dropdown-toggle text-warning-emphasis fw-bold"
-			  id="versionDropdown"
-			  data-bs-toggle="dropdown"
-			  aria-expanded="false"
-			>
-			  Selecciona Versión
-			</button>
-			<ul class="dropdown-menu">
-			  {#if error}
-				<li>
-				  <p style="color: red;" class="dropdown-item">Error: {error}</p>
-				</li>
-			  {:else if loadingVersions}
-				<li>
-				  <p class="dropdown-item">Cargando versiones...</p>
-				</li>
-			  {:else if versions.length > 0}
-				{#each versions as version}
-				  <li class="d-flex justify-content-between align-items-center">
-					<button
-					  class="dropdown-item text-warning-emphasis"
-					  on:click={() => (selectedVersion = version.version)}
-					>
-					  {version.name}
-					</button>
-					<button
-					  class="btn btn-sm btn-warning me-2"
-					  on:click={() => downloadVersion(version.version)}
-					  disabled={loading && selectedVersion === version.version}
-					>
-					  {loading && selectedVersion === version.version ? 'Descargando...' : 'Descargar'}
-					</button>
-				  </li>
-				{/each}
-			  {:else}
-				<li>
-				  <p class="dropdown-item">No se encontraron versiones disponibles.</p>
-				</li>
-			  {/if}
-			</ul>
-		  </li>
-  
 		  <li class="nav-item">
 			<div class="d-flex align-items-center">
 			  {#if selectedVersion && books.length > 0}
