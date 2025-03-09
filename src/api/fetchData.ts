@@ -72,11 +72,10 @@ export async function fetchVersions(): Promise<Version[]> {
   console.log("Obteniendo versiones desde la API...");
   const versions = await fetchFromAPI<Version[]>(`${CONFIG.apiBaseUrl}/versions`);
   console.log("Versiones obtenidas:", versions);
-
-  // Eliminar el filtro para devolver todas las versiones
   return versions;
 }
 
+// Función para obtener los libros de una versión específica
 export async function fetchBooks(version: string): Promise<Book[]> {
   try {
     const response = await fetch(`${CONFIG.apiBaseUrl}/books?version=${version}`);
@@ -161,71 +160,6 @@ async function downloadChaptersInParallel(
   await runWithConcurrency(tasks, concurrencyLimit);
 }
 
-// Función para precargar toda la Biblia con paralelismo
-export async function preloadFullBible(setProgress: (progress: number) => void): Promise<void> {
-  try {
-    const versions = await fetchVersions(); // Obtener todas las versiones
-    let totalChapters = 0;
-
-    // Calcular el número total de capítulos
-    for (const version of versions) {
-      const books = await fetchBooks(version.version);
-      for (const book of books) {
-        totalChapters += book.chapters;
-      }
-    }
-
-    let currentChapter = 0;
-
-    // Descargar y guardar cada capítulo en paralelo
-    for (const version of versions) {
-      const books = await fetchBooks(version.version);
-
-      for (const book of books) {
-        await downloadChaptersInParallel(version.version, book); // Descargar capítulos
-
-        // Actualizar progreso
-        currentChapter += book.chapters;
-        const progress = Math.floor((currentChapter / totalChapters) * 100);
-        setProgress(progress); // Llamada al callback para actualizar el progreso
-      }
-    }
-
-    console.log("Toda la Biblia ha sido descargada y guardada en localStorage.");
-  } catch (error) {
-    console.error("Error durante la precarga de la Biblia:", error);
-    throw error; // Relanzar el error para manejarlo en initializeApp
-  }
-}
-
-// Función para inicializar la aplicación
-export async function initializeApp(
-  setProgress: (progress: number) => void
-): Promise<void> {
-  console.log("Iniciando la aplicación...");
-
-  try {
-    const versionsToDownload = await fetchVersions(); // Obtener solo las versiones filtradas
-
-    for (const versionData of versionsToDownload) {
-      console.log(`Precargando la versión ${versionData.version}...`);
-      await preloadVersion(versionData.version, setProgress);
-    }
-
-    console.log("Descarga completada.");
-  } catch (error) {
-    console.error("Error durante la inicialización de la aplicación:", error);
-    throw error;
-  }
-}
-
-// Función para limpiar el localStorage antes de descargar una nueva versión
-function clearLocalStorage(): void {
-  localStorage.clear();
-  console.log("localStorage limpiado.");
-}
-
-
 // Función para precargar una versión específica
 export async function preloadVersion(
   version: string,
@@ -261,6 +195,12 @@ export async function preloadVersion(
   }
 }
 
+// Función para limpiar el localStorage antes de descargar una nueva versión
+function clearLocalStorage(): void {
+  localStorage.clear();
+  console.log("localStorage limpiado.");
+}
+
 // Función para guardar datos en localStorage
 function saveToLocalStorage(version: string, book: string, chapter: number, data: ChapterData): void {
   const key = `${version}-${book}-${chapter}`;
@@ -275,41 +215,8 @@ function getFromLocalStorage(version: string, book: string, chapter: number): Ch
   return compressedData ? decompressData(compressedData) : null;
 }
 
-// Función para mostrar un selector de versiones
-export async function showVersionSelector(): Promise<string> {
-  const versions = await fetchVersions(); // Obtener todas las versiones disponibles
-
-  // Aquí podrías implementar la lógica para mostrar un selector de versiones en la UI
-  // Por simplicidad, asumimos que el usuario selecciona la primera versión
-  const selectedVersion = versions[0].version; // Cambia esto según la lógica de tu UI
-
-  return selectedVersion;
-}
-
-// Función para inicializar la aplicación con la versión seleccionada
-// Función principal para inicializar la aplicación con la versión seleccionada
-export async function initializeAppWithSelectedVersion(
-  setProgress: (progress: number) => void
-): Promise<void> {
-  console.log("Iniciando la aplicación con la versión seleccionada...");
-
-  try {
-    const selectedVersion = await showVersionSelector(); // Mostrar selector de versiones
-    console.log(`Versión seleccionada: ${selectedVersion}`);
-
-    // Precargar solo la versión seleccionada
-    await preloadVersion(selectedVersion, setProgress);
-
-    console.log("Descarga completada.");
-  } catch (error) {
-    console.error("Error durante la inicialización de la aplicación:", error);
-    throw error;
-  }
-}
-
 // Función para comprimir datos antes de guardar en localStorage
 function compressData(data: ChapterData): string {
-  // Aquí podrías usar una librería de compresión como LZString
   return JSON.stringify(data); // Por ahora, simplemente convertimos a JSON
 }
 
@@ -317,4 +224,3 @@ function compressData(data: ChapterData): string {
 function decompressData(compressedData: string): ChapterData {
   return JSON.parse(compressedData); // Por ahora, simplemente parseamos el JSON
 }
-
