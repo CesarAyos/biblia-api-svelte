@@ -65,45 +65,45 @@
 	}
 
 	async function loadChapter() {
-		if (!selectedBook || !selectedChapter || !selectedVersion) {
-			error = 'Por favor selecciona un libro, versión y capítulo válidos.';
-			return;
-		}
+    if (!selectedBook || !selectedChapter || !selectedVersion) {
+        error = 'Por favor selecciona un libro, versión y capítulo válidos.';
+        return;
+    }
 
-		isLoading = true;
-		chapterData = null;
-		error = null;
-		selectedVerses = [];
-		feedbackMessage = null;
+    isLoading = true;
+    chapterData = null;
+    error = null;
+    selectedVerses = [];
+    feedbackMessage = null;
 
-		// Intentar cargar desde localStorage
-		const cachedData = getFromLocalStorage(selectedVersion, selectedBook.toLowerCase(), selectedChapter);
-		if (cachedData) {
-			console.log(`Datos obtenidos del localStorage: ${selectedVersion}-${selectedBook}-${selectedChapter}`);
-			chapterData = cachedData;
-			loadMarkedVerses(); // Cargar versículos marcados al cargar el capítulo
-			showModal = true;
-			isLoading = false;
-			return;
-		}
+    // Intentar cargar desde localStorage
+    const cachedData = getFromLocalStorage(selectedVersion, selectedBook.toLowerCase(), selectedChapter);
+    if (cachedData) {
+        console.log(`Datos obtenidos del localStorage: ${selectedVersion}-${selectedBook}-${selectedChapter}`);
+        chapterData = cachedData; // Asignar los datos del localStorage al estado
+        loadMarkedVerses(); // Cargar versículos marcados
+        showModal = true;
+        isLoading = false;
+        return; // Salir de la función después de cargar desde localStorage
+    }
 
-		// Si no hay datos en localStorage, hacer la solicitud a la API
-		try {
-			chapterData = await fetchChapter(
-				selectedVersion,
-				selectedBook.toLowerCase(),
-				selectedChapter
-			);
-			saveToLocalStorage(selectedVersion, selectedBook.toLowerCase(), selectedChapter, chapterData); // Guardar en localStorage
-			loadMarkedVerses(); // Cargar versículos marcados al cargar el capítulo
-			showModal = true;
-		} catch (err) {
-			const errorObj = err as Error;
-			error = errorObj.message || 'Error al cargar el capítulo.';
-		} finally {
-			isLoading = false;
-		}
-	}
+    // Si no hay datos en localStorage, hacer la solicitud a la API
+    try {
+        chapterData = await fetchChapter(
+            selectedVersion,
+            selectedBook.toLowerCase(),
+            selectedChapter
+        );
+        saveToLocalStorage(selectedVersion, selectedBook.toLowerCase(), selectedChapter, chapterData); // Guardar en localStorage
+        loadMarkedVerses(); // Cargar versículos marcados
+        showModal = true;
+    } catch (err) {
+        const errorObj = err as Error;
+        error = errorObj.message || 'Error al cargar el capítulo.';
+    } finally {
+        isLoading = false;
+    }
+}
 
 	function toggleVerseSelection(verseNumber: number, verseText: string) {
 		if (!selectedColor) {
@@ -220,33 +220,25 @@
 	{/if}
 
 	{#if chapterData && chapterData.vers?.length > 0}
-		{#if buttonsVisible && selectedVerses.length > 0}
-			<div id="actions" class="overflow-auto sticky-actions d-flex justify-content-center">
-				<button on:click={copySelectedVerses} class="btn btn-primary">Copiar</button>
-				<button on:click={shareSelectedVersesViaWhatsApp} class="btn btn-success">WhatsApp</button>
-				<p class="feedback-message mt-2">{feedbackMessage}</p>
-			</div>
-		{/if}
-
-		<ul class="verse-list">
-			{#each chapterData.vers as verse}
-				<li id="verse-{verse.number}" class="verse-item">
-					<button
-						type="button"
-						class="verse-btn {selectedVerses.find((v) => v.number === verse.number)
-							? 'selected'
-							: ''}"
-						style:background-color={selectedVerses.find((v) => v.number === verse.number)?.color ||
-							'transparent'}
-						on:click={() => toggleVerseSelection(verse.number, verse.verse)}
-					>
-						<strong class="verse-number">{verse.number}:</strong>
-						{verse.verse}
-					</button>
-				</li>
-			{/each}
-		</ul>
-	{/if}
+    <ul class="verse-list">
+        {#each chapterData.vers as verse}
+            <li id="verse-{verse.number}" class="verse-item">
+                <button
+                    type="button"
+                    class="verse-btn {selectedVerses.find((v) => v.number === verse.number)
+                        ? 'selected'
+                        : ''}"
+                    style:background-color={selectedVerses.find((v) => v.number === verse.number)?.color ||
+                        'transparent'}
+                    on:click={() => toggleVerseSelection(verse.number, verse.verse)}
+                >
+                    <strong class="verse-number">{verse.number}:</strong>
+                    {verse.verse}
+                </button>
+            </li>
+        {/each}
+    </ul>
+{/if}
 
 	<!-- Botón flotante para seleccionar colores -->
 	<div class="floating-color-picker">
