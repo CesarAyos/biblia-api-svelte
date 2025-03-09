@@ -144,7 +144,6 @@ async function fetchAndCache<T>(key: string, url: string): Promise<T> {
 }
 
 // Función para obtener las versiones de la Biblia
-// fetchData.ts
 export async function fetchVersions(): Promise<Version[]> {
   const key = "bible_versions";
   const cachedData = await getFromIndexedDB(key);
@@ -168,7 +167,6 @@ export async function fetchVersions(): Promise<Version[]> {
 }
 
 // Función para obtener los libros de una versión
-// fetchData.ts
 export async function fetchBooks(version: string): Promise<Book[]> {
   const key = `books_${version}`;
   const cachedData = await getFromIndexedDB(key);
@@ -336,7 +334,6 @@ async function downloadChaptersInParallel(
 }
 
 // Función para precargar toda la Biblia con paralelismo
-// fetchData.ts
 export async function preloadFullBible(setProgress: (progress: number) => void): Promise<void> {
   try {
     const versions = await fetchVersions(); // Obtener versiones
@@ -374,7 +371,6 @@ export async function preloadFullBible(setProgress: (progress: number) => void):
 }
 
 // Función para verificar si toda la Biblia está descargada
-// fetchData.ts
 export async function isBibleFullyDownloaded(): Promise<boolean> {
   try {
     const versions = await fetchVersions();
@@ -400,26 +396,86 @@ export async function isBibleFullyDownloaded(): Promise<boolean> {
 }
 
 // Función para inicializar la aplicación
-// fetchData.ts
-export async function initializeApp(setProgress: (progress: number) => void): Promise<void> {
+export async function initializeApp(
+  setProgress: (progress: number) => void,
+  version?: string // Versión específica a descargar (opcional)
+): Promise<void> {
   console.log("Iniciando la aplicación y verificando la caché...");
 
   try {
-    const isComplete = await isBibleFullyDownloaded();
-    if (isComplete) {
-      console.log("Toda la Biblia está descargada y lista.");
-    } else {
-      console.log("Precargando la Biblia...");
-      await preloadFullBible(setProgress); // Pasa setProgress a preloadFullBible
-      console.log("Toda la Biblia ha sido descargada y almacenada correctamente.");
+    const versions = version ? [{ version }] : await fetchVersions(); // Si se especifica una versión, usarla
+
+    for (const versionData of versions) {
+      const isComplete = await isVersionFullyDownloaded(versionData.version);
+      if (isComplete) {
+        console.log(`La versión ${versionData.version} ya está descargada.`);
+        continue;
+      }
+
+      console.log(`Precargando la versión ${versionData.version}...`);
+      await preloadVersion(versionData.version, setProgress); // Precargar solo la versión sele // Precargar solo la versión seleccionada
+
+      // Actualizar el estado en localStorage
+      localStorage.setItem(`bibleDownloaded_${versionData.version}`, 'true');
     }
+
+    console.log("Descarga completada.");
   } catch (error) {
     console.error("Error durante la inicialización de la aplicación:", error);
     throw error;
   }
-
-  console.log("Aplicación lista.");
 }
+
+export async function isVersionFullyDownloaded(version: string): Promise<boolean> {
+  try {
+    const books = await fetchBooks(version);
+    for (const book of books) {
+      for (let chapter = 1; chapter <= book.chapters; chapter++) {
+        const cacheKey = `chapter_${version}_${book.abrev}_${chapter}`;
+        const cachedData = await getFromIndexedDB(cacheKey);
+        if (!cachedData) {
+          console.warn(`Falta el capítulo ${chapter} del libro ${book.abrev} en la versión ${version}`);
+          return false;
+        }
+      }
+    }
+    console.log(`La versión ${version} está completamente descargada y almacenada.`);
+    return true;
+  } catch (error) {
+    console.error(`Error al verificar si la versión ${version} está descargada:`, error);
+    return false;
+  }
+}
+
+async function preloadVersion(version: string, setProgress: (progress: number) => void): Promise<void> {
+  try {
+    const books = await fetchBooks(version);
+    let totalChapters = 0;
+
+    // Calcular el número total de capítulos
+    for (const book of books) {
+      totalChapters += book.chapters;
+    }
+
+    let currentChapter = 0;
+
+    // Descargar y guardar cada capítulo en paralelo
+    for (const book of books) {
+      await downloadChaptersInParallel(version, book, true); // Forzar descarga
+
+      // Actualizar progreso
+      currentChapter += book.chapters;
+      const progress = Math.floor((currentChapter / totalChapters) * 100);
+      setProgress(progress); // Llamada al callback para actualizar el progreso
+    }
+
+    console.log(`Versión ${version} descargada y almacenada en el caché.`);
+  } catch (error) {
+    console.error(`Error durante la precarga de la versión ${version}:`, error);
+    throw error;
+  }
+}
+
 
 // Función para validar si la descarga está completa
 export async function validateDownloadComplete(): Promise<boolean> {
