@@ -1,60 +1,36 @@
-// Configuración global para evitar valores duplicados y centralizar configuraciones
 const CONFIG = {
   apiBaseUrl: "https://bible-api.deno.dev/api",
 };
 
-// Interfaz para las versiones de la Biblia
 export interface Version {
-  name: string; // Nombre de la versión
-  verse: string; // Versículo representativo de la versión
-  uri: string; // URI de la versión
-  version: string; // Identificador de la versión
+  name: string;
+  verse: string;
+  uri: string;
+  version: string;
 }
 
-// Interfaz para un libro de la Biblia
 export interface Book {
-  names: string[]; // Lista de nombres para cada libro
-  abrev: string; // Abreviatura del libro
-  chapters: number; // Número total de capítulos
-  testament: string; // Testamento (old o new)
+  names: string[];
+  abrev: string;
+  chapters: number;
+  testament: string;
 }
 
-// Interfaz para los datos de un capítulo
 export interface ChapterData {
   vers: Array<{
-    verse: string; // Texto del versículo
-    number: number; // Número del versículo
-    id: number; // ID del versículo
-    study?: string; // Estudio opcional
-  }>;
-  chapter: number; // Número del capítulo
-  name: string; // Nombre del libro
-  num_chapters: number; // Número total de capítulos
-  testament: string; // Testamento
-}
-
-// Tipo para los datos de búsqueda
-export type SearchData = {
-  data: Array<{
-    id: number;
     verse: string;
-    book: string;
-    chapter: number;
     number: number;
+    id: number;
+    study?: string;
   }>;
-  pagination?: {
-    page: number; // Página actual
-    total_pages: number; // Número total de páginas
-    total_results: number; // Total de resultados
-  };
-  total: number; // Total de resultados
-  page: number; // Página actual
-  take: number; // Resultados por página
-};
+  chapter: number;
+  name: string;
+  num_chapters: number;
+  testament: string;
+}
 
 // Función para obtener datos de la API
 async function fetchFromAPI<T>(url: string): Promise<T> {
-  console.log(`Descargando datos desde la API: ${url}`);
   try {
     const response = await fetch(url);
     if (!response.ok) {
@@ -67,58 +43,18 @@ async function fetchFromAPI<T>(url: string): Promise<T> {
   }
 }
 
-// Función para obtener las versiones de la Biblia
-export async function fetchVersions(): Promise<Version[]> {
-  console.log("Obteniendo versiones desde la API...");
-  const versions = await fetchFromAPI<Version[]>(`${CONFIG.apiBaseUrl}/versions`);
-  console.log("Versiones obtenidas:", versions);
-  return versions;
-}
-
-// Función para obtener los libros de una versión específica
-export async function fetchBooks(version: string): Promise<Book[]> {
-  try {
-    const response = await fetch(`${CONFIG.apiBaseUrl}/books?version=${version}`);
-    if (!response.ok) {
-      throw new Error(`Error al obtener libros: ${response.status} ${response.statusText}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`Error al obtener libros para la versión ${version}:`, error);
-    throw error;
-  }
-}
-
-// Función para obtener un capítulo
+// Función para descargar un capítulo
 export async function fetchChapter(version: string, book: string, chapter: number): Promise<ChapterData> {
-  const cachedData = getFromLocalStorage(version, book, chapter);
-  if (cachedData) {
-    console.log(`Datos obtenidos del localStorage: ${version}-${book}-${chapter}`);
-    return cachedData;
-  }
-
   const url = `${CONFIG.apiBaseUrl}/read/${version}/${book}/${chapter}`;
-  const data = await fetchFromAPI<ChapterData>(url);
-  saveToLocalStorage(version, book, chapter, data);
-  return data;
-}
-
-// Función para realizar búsquedas
-export async function fetchSearch(version: string, query: string, take: number = 10, page: number = 1): Promise<SearchData> {
-  if (!version || !query) {
-    throw new Error("Los parámetros 'version' y 'query' son obligatorios.");
-  }
-
-  const url = `${CONFIG.apiBaseUrl}/read/${version}/search?q=${encodeURIComponent(query)}&take=${take}&page=${page}`;
-  return fetchFromAPI<SearchData>(url);
+  return fetchFromAPI<ChapterData>(url);
 }
 
 // Función para descargar múltiples capítulos en paralelo con límite de concurrencia
 async function downloadChaptersInParallel(
   version: string,
   book: Book,
-  concurrencyLimit: number = 5
+  concurrencyLimit: number = 5,
+  onProgress: (progress: number) => void
 ): Promise<void> {
   const chaptersToDownload = Array.from({ length: book.chapters }, (_, i) => i + 1);
 
@@ -126,8 +62,8 @@ async function downloadChaptersInParallel(
   const downloadChapter = async (chapter: number): Promise<void> => {
     try {
       const data = await fetchChapter(version, book.abrev, chapter);
-      saveToLocalStorage(version, book.abrev, chapter, data); // Guardar en localStorage
-      console.log(`Descargado y guardado capítulo ${chapter} del libro ${book.abrev} (${version})`);
+      saveToLocalStorage(version, book.abrev, chapter, data);
+      console.log(`Descargado y guardado: ${version}-${book.abrev}-${chapter}`);
     } catch (error) {
       console.error(`Error al descargar el capítulo ${chapter} del libro ${book.abrev}:`, error);
       throw error;
@@ -154,21 +90,26 @@ async function downloadChaptersInParallel(
   };
 
   // Crear tareas de descarga
-  const tasks = chaptersToDownload.map(chapter => () => downloadChapter(chapter));
+  const tasks = chaptersToDownload.map((chapter, index) => {
+    return () => {
+      return downloadChapter(chapter).then(() => {
+        const progress = Math.floor(((index + 1) / chaptersToDownload.length) * 100);
+        onProgress(progress); // Actualizar el progreso
+      });
+    };
+  });
 
   // Ejecutar tareas con límite de concurrencia
   await runWithConcurrency(tasks, concurrencyLimit);
 }
 
-// Función para precargar una versión específica
+// Función para descargar una versión completa de la Biblia
 export async function preloadVersion(
   version: string,
-  setProgress: (progress: number) => void
+  onProgress: (progress: number) => void
 ): Promise<void> {
   try {
-    clearLocalStorage(); // Limpiar localStorage antes de descargar
-
-    const books = await fetchBooks(version); // Obtener los libros de la versión seleccionada
+    const books = await fetchBooks(version);
     let totalChapters = 0;
 
     // Calcular el número total de capítulos
@@ -178,14 +119,14 @@ export async function preloadVersion(
 
     let currentChapter = 0;
 
-    // Descargar y guardar cada capítulo en paralelo
+    // Descargar y guardar cada libro en paralelo
     for (const book of books) {
-      await downloadChaptersInParallel(version, book); // Descargar capítulos
+      await downloadChaptersInParallel(version, book, 5, (progress) => {
+        const overallProgress = Math.floor((currentChapter + progress * book.chapters / 100) / totalChapters * 100);
+        onProgress(overallProgress); // Actualizar el progreso general
+      });
 
-      // Actualizar progreso
       currentChapter += book.chapters;
-      const progress = Math.floor((currentChapter / totalChapters) * 100);
-      setProgress(progress); // Llamada al callback para actualizar el progreso
     }
 
     console.log(`Versión ${version} descargada y guardada en localStorage.`);
@@ -195,32 +136,44 @@ export async function preloadVersion(
   }
 }
 
-// Función para limpiar el localStorage antes de descargar una nueva versión
-function clearLocalStorage(): void {
-  localStorage.clear();
-  console.log("localStorage limpiado.");
-}
-
 // Función para guardar datos en localStorage
 function saveToLocalStorage(version: string, book: string, chapter: number, data: ChapterData): void {
   const key = `${version}-${book}-${chapter}`;
-  const compressedData = compressData(data);
+  const compressedData = JSON.stringify(data); // Comprimir datos
   localStorage.setItem(key, compressedData);
 }
 
 // Función para obtener datos de localStorage
-function getFromLocalStorage(version: string, book: string, chapter: number): ChapterData | null {
+export function getFromLocalStorage(version: string, book: string, chapter: number): ChapterData | null {
   const key = `${version}-${book}-${chapter}`;
   const compressedData = localStorage.getItem(key);
-  return compressedData ? decompressData(compressedData) : null;
+  return compressedData ? JSON.parse(compressedData) : null; // Descomprimir datos
 }
 
-// Función para comprimir datos antes de guardar en localStorage
-function compressData(data: ChapterData): string {
-  return JSON.stringify(data); // Por ahora, simplemente convertimos a JSON
+// Función para obtener los libros de una versión específica
+export async function fetchBooks(version: string): Promise<Book[]> {
+  try {
+    const response = await fetch(`${CONFIG.apiBaseUrl}/books?version=${version}`);
+    if (!response.ok) {
+      throw new Error(`Error al obtener libros: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error al obtener libros para la versión ${version}:`, error);
+    throw error;
+  }
 }
 
-// Función para descomprimir datos al leer de localStorage
-function decompressData(compressedData: string): ChapterData {
-  return JSON.parse(compressedData); // Por ahora, simplemente parseamos el JSON
+// Función para obtener las versiones de la Biblia
+export async function fetchVersions(): Promise<Version[]> {
+  try {
+    const response = await fetch(`${CONFIG.apiBaseUrl}/versions`);
+    if (!response.ok) {
+      throw new Error(`Error al obtener versiones: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error al obtener versiones:`, error);
+    throw error;
+  }
 }

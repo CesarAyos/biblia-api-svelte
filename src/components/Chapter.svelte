@@ -1,29 +1,27 @@
 <script lang="ts">
-	import { fetchChapter } from '../api/fetchData.js';
-	import type { ChapterData, Book } from '../api/fetchData.js';
+	import { fetchChapter, preloadVersion, getFromLocalStorage } from '../api/fetchData';
+	import type { ChapterData, Book } from '../api/fetchData';
 
-	// Define un tipo para los versículos marcados
-	type MarkedVerse = {
-		number: number;
-		text: string;
-		color?: string;
-	};
-
+	// Propiedades del componente
 	export let selectedBook: string;
 	export let selectedVersion: string;
-	export let bookDetails: Book | null = null;
-	let selectedChapter: number | null = null;
+	export let bookDetails: Book;
+	export let selectedChapter: number | null = null; // Asegúrate de que selectedChapter esté definido
+
+	// Variables de estado
 	let chapterData: ChapterData | null = null;
 	let isLoading = false;
 	let error: string | null = null;
 	let feedbackMessage: string | null = null;
-	let selectedVerses: MarkedVerse[] = [];
+	let selectedVerses: { number: number; text: string; color?: string }[] = [];
 	let showModal = false;
-	let buttonsEnabled = false;
 	let buttonsVisible = false;
 	let selectionTimeout: number | null = null;
 	let selectedColor: string | null = null;
 	let showColorPicker = false;
+	let loadingDownload = false;
+	let downloadProgress = 0;
+	let statusMessage = '';
 
 	const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF'];
 
@@ -35,16 +33,22 @@
 		}
 	}
 
-	// Guardar versículos marcados en localStorage
-	function saveMarkedVerses() {
-		localStorage.setItem(`markedVerses-${selectedBook}-${selectedChapter}`, JSON.stringify(selectedVerses));
+	function goToVerse(verseNumber: number) {
+		const verseElement = document.getElementById(`verse-${verseNumber}`);
+		if (verseElement) {
+			verseElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			closeModal(); // Cerrar el modal después de navegar al versículo
+		} else {
+			console.error(`El versículo ${verseNumber} no se encontró.`);
+		}
 	}
 
-	// Obtener datos del localStorage
-	function getFromLocalStorage(version: string, book: string, chapter: number): ChapterData | null {
-		const key = `${version}-${book}-${chapter}`;
-		const compressedData = localStorage.getItem(key);
-		return compressedData ? JSON.parse(compressedData) : null; // Descomprimir datos
+	// Guardar versículos marcados en localStorage
+	function saveMarkedVerses() {
+		localStorage.setItem(
+			`markedVerses-${selectedBook}-${selectedChapter}`,
+			JSON.stringify(selectedVerses)
+		);
 	}
 
 	// Guardar datos en localStorage
@@ -54,57 +58,73 @@
 		localStorage.setItem(key, compressedData);
 	}
 
-	function goToVerse(verseNumber: number) {
-		const verseElement = document.getElementById(`verse-${verseNumber}`);
-		if (verseElement) {
-			verseElement.scrollIntoView({ behavior: 'smooth' });
-			closeModal();
-		} else {
-			console.error(`El versículo ${verseNumber} no se encontró.`);
+	// Cargar un capítulo desde el localStorage o la API
+	async function loadChapter() {
+		if (!selectedBook || !selectedChapter || !selectedVersion) {
+			error = 'Por favor selecciona un libro, versión y capítulo válidos.';
+			return;
+		}
+
+		isLoading = true;
+		chapterData = null;
+		error = null;
+		selectedVerses = [];
+		feedbackMessage = null;
+
+		// Intentar cargar desde localStorage
+		const cachedData = getFromLocalStorage(
+			selectedVersion,
+			selectedBook.toLowerCase(),
+			selectedChapter
+		);
+		if (cachedData) {
+			console.log(
+				`Datos obtenidos del localStorage: ${selectedVersion}-${selectedBook}-${selectedChapter}`
+			);
+			chapterData = cachedData;
+			loadMarkedVerses();
+			showModal = true;
+			isLoading = false;
+			return;
+		}
+
+		// Si no hay datos en localStorage, hacer la solicitud a la API
+		try {
+			chapterData = await fetchChapter(
+				selectedVersion,
+				selectedBook.toLowerCase(),
+				selectedChapter
+			);
+			saveToLocalStorage(selectedVersion, selectedBook.toLowerCase(), selectedChapter, chapterData);
+			loadMarkedVerses();
+			showModal = true;
+		} catch (err) {
+			const errorObj = err as Error;
+			error = errorObj.message || 'Error al cargar el capítulo.';
+		} finally {
+			isLoading = false;
 		}
 	}
 
-	async function loadChapter() {
-    if (!selectedBook || !selectedChapter || !selectedVersion) {
-        error = 'Por favor selecciona un libro, versión y capítulo válidos.';
-        return;
-    }
+	// Descargar una versión completa de la Biblia
+	async function downloadVersion() {
+		try {
+			loadingDownload = true;
+			statusMessage = `Descargando la versión ${selectedVersion}...`;
+			await preloadVersion(selectedVersion, (progress) => {
+				downloadProgress = progress;
+			});
+			statusMessage = `Versión ${selectedVersion} descargada correctamente.`;
+		} catch (err) {
+			const errorObj = err as Error;
+			statusMessage = `Error al descargar la versión ${selectedVersion}: ${errorObj.message}`;
+			console.error(statusMessage);
+		} finally {
+			loadingDownload = false;
+		}
+	}
 
-    isLoading = true;
-    chapterData = null;
-    error = null;
-    selectedVerses = [];
-    feedbackMessage = null;
-
-    // Intentar cargar desde localStorage
-    const cachedData = getFromLocalStorage(selectedVersion, selectedBook.toLowerCase(), selectedChapter);
-    if (cachedData) {
-        console.log(`Datos obtenidos del localStorage: ${selectedVersion}-${selectedBook}-${selectedChapter}`);
-        chapterData = cachedData; // Asignar los datos del localStorage al estado
-        loadMarkedVerses(); // Cargar versículos marcados
-        showModal = true;
-        isLoading = false;
-        return; // Salir de la función después de cargar desde localStorage
-    }
-
-    // Si no hay datos en localStorage, hacer la solicitud a la API
-    try {
-        chapterData = await fetchChapter(
-            selectedVersion,
-            selectedBook.toLowerCase(),
-            selectedChapter
-        );
-        saveToLocalStorage(selectedVersion, selectedBook.toLowerCase(), selectedChapter, chapterData); // Guardar en localStorage
-        loadMarkedVerses(); // Cargar versículos marcados
-        showModal = true;
-    } catch (err) {
-        const errorObj = err as Error;
-        error = errorObj.message || 'Error al cargar el capítulo.';
-    } finally {
-        isLoading = false;
-    }
-}
-
+	// Seleccionar o deseleccionar un versículo
 	function toggleVerseSelection(verseNumber: number, verseText: string) {
 		if (!selectedColor) {
 			feedbackMessage = 'Selecciona un color antes de marcar un versículo.';
@@ -116,65 +136,61 @@
 
 		if (index >= 0) {
 			selectedVerses.splice(index, 1);
-			selectedVerses = [...selectedVerses];
-			buttonsVisible = selectedVerses.length > 0;
-			if (selectionTimeout) clearTimeout(selectionTimeout);
 		} else {
 			selectedVerses.push({ number: verseNumber, text: verseText, color: selectedColor });
-			selectedVerses = [...selectedVerses];
-
-			buttonsVisible = false;
-			if (selectionTimeout) clearTimeout(selectionTimeout);
-			selectionTimeout = window.setTimeout(() => {
-				buttonsVisible = true;
-			}, 1000);
 		}
 
-		saveMarkedVerses(); // Guardar versículos marcados
+		selectedVerses = [...selectedVerses]; // Actualizar el estado
+		buttonsVisible = selectedVerses.length > 0;
+		saveMarkedVerses();
+
+		if (selectionTimeout) clearTimeout(selectionTimeout);
+		selectionTimeout = window.setTimeout(() => {
+			buttonsVisible = true;
+		}, 1000);
 	}
 
+	// Copiar versículos seleccionados al portapapeles
 	function copySelectedVerses() {
 		if (selectedVerses.length > 0) {
-			setTimeout(() => {
-				const textToCopy = selectedVerses
-					.map(
-						(v) =>
-							`${selectedBook || 'Libro desconocido'} (${
-								selectedVersion || 'Versión desconocida'
-							}), Capítulo ${selectedChapter || 'N/A'}, Versículo ${v.number}: ${v.text}`
-					)
-					.join('\n');
-				navigator.clipboard.writeText(textToCopy).then(() => {
-					feedbackMessage = 'Texto copiado al portapapeles.';
-					setTimeout(() => (feedbackMessage = null), 3000);
-				});
-			}, 1000);
+			const textToCopy = selectedVerses
+				.map(
+					(v) =>
+						`${selectedBook || 'Libro desconocido'} (${
+							selectedVersion || 'Versión desconocida'
+						}), Capítulo ${selectedChapter || 'N/A'}, Versículo ${v.number}: ${v.text}`
+				)
+				.join('\n');
+			navigator.clipboard.writeText(textToCopy).then(() => {
+				feedbackMessage = 'Texto copiado al portapapeles.';
+				setTimeout(() => (feedbackMessage = null), 3000);
+			});
 		} else {
 			feedbackMessage = 'Selecciona al menos un versículo para copiar.';
 			setTimeout(() => (feedbackMessage = null), 3000);
 		}
 	}
 
+	// Compartir versículos seleccionados por WhatsApp
 	function shareSelectedVersesViaWhatsApp() {
 		if (selectedVerses.length > 0) {
-			setTimeout(() => {
-				const textToShare = selectedVerses
-					.map(
-						(v) =>
-							`${selectedBook || 'Libro desconocido'} (${
-								selectedVersion || 'Versión desconocida'
-							}), Capítulo ${selectedChapter || 'N/A'}, Versículo ${v.number}: ${v.text}`
-					)
-					.join('\n');
-				const shareURL = `https://wa.me/?text=${encodeURIComponent(textToShare)}`;
-				window.open(shareURL, '_blank');
-			}, 1000);
+			const textToShare = selectedVerses
+				.map(
+					(v) =>
+						`${selectedBook || 'Libro desconocido'} (${
+							selectedVersion || 'Versión desconocida'
+						}), Capítulo ${selectedChapter || 'N/A'}, Versículo ${v.number}: ${v.text}`
+				)
+				.join('\n');
+			const shareURL = `https://wa.me/?text=${encodeURIComponent(textToShare)}`;
+			window.open(shareURL, '_blank');
 		} else {
 			feedbackMessage = 'Selecciona al menos un versículo para compartir.';
 			setTimeout(() => (feedbackMessage = null), 3000);
 		}
 	}
 
+	// Cerrar el modal
 	function closeModal() {
 		showModal = false;
 	}
@@ -182,11 +198,24 @@
 	// Seleccionar un color
 	function selectColor(color: string) {
 		selectedColor = color;
-		showColorPicker = false; // Oculta el selector de colores después de seleccionar uno
+		showColorPicker = false;
 	}
 </script>
 
 <main>
+	<!-- Botón para descargar la versión seleccionada -->
+	<button class="btn btn-warning" on:click={downloadVersion} disabled={loadingDownload}>
+		{loadingDownload ? `Descargando... ${downloadProgress}%` : 'Descargar Biblia'}
+	</button>
+
+	<!-- Mensaje de estado de la descarga -->
+	{#if statusMessage}
+		<div class="alert alert-info mt-3">
+			{statusMessage}
+		</div>
+	{/if}
+
+	<!-- Selector de capítulo -->
 	<div class="chapter-dropdown">
 		{#if bookDetails}
 			<select
@@ -211,6 +240,7 @@
 		{/if}
 	</div>
 
+	<!-- Indicador de carga -->
 	{#if isLoading}
 		<div class="loader-container">
 			<div class="spinner-border text-primary" role="status">
@@ -219,26 +249,27 @@
 		</div>
 	{/if}
 
+	<!-- Lista de versículos -->
 	{#if chapterData && chapterData.vers?.length > 0}
-    <ul class="verse-list">
-        {#each chapterData.vers as verse}
-            <li id="verse-{verse.number}" class="verse-item">
-                <button
-                    type="button"
-                    class="verse-btn {selectedVerses.find((v) => v.number === verse.number)
-                        ? 'selected'
-                        : ''}"
-                    style:background-color={selectedVerses.find((v) => v.number === verse.number)?.color ||
-                        'transparent'}
-                    on:click={() => toggleVerseSelection(verse.number, verse.verse)}
-                >
-                    <strong class="verse-number">{verse.number}:</strong>
-                    {verse.verse}
-                </button>
-            </li>
-        {/each}
-    </ul>
-{/if}
+		<ul class="verse-list">
+			{#each chapterData.vers as verse}
+				<li id="verse-{verse.number}" class="verse-item">
+					<button
+						type="button"
+						class="verse-btn {selectedVerses.find((v) => v.number === verse.number)
+							? 'selected'
+							: ''}"
+						style:background-color={selectedVerses.find((v) => v.number === verse.number)?.color ||
+							'transparent'}
+						on:click={() => toggleVerseSelection(verse.number, verse.verse)}
+					>
+						<strong class="verse-number">{verse.number}:</strong>
+						{verse.verse}
+					</button>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 
 	<!-- Botón flotante para seleccionar colores -->
 	<div class="floating-color-picker">
@@ -285,174 +316,3 @@
 		</div>
 	{/if}
 </main>
-
-<style>
-	.floating-color-picker {
-		position: fixed;
-		bottom: 20px;
-		right: 20px;
-		z-index: 1000;
-		border-radius: 100%;
-	}
-
-	.color-picker-btn {
-		background-color: #ffffff;
-		border: 2px solid #000000;
-		border-radius: 50%;
-		width: 50px;
-		height: 50px;
-		font-size: 24px;
-		cursor: pointer;
-		box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-	}
-
-	.color-options {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-		margin-top: 10px;
-	}
-
-	.color-option {
-		width: 40px;
-		height: 40px;
-		border-radius: 50%;
-		border: 2px solid #000000;
-		cursor: pointer;
-	}
-
-	.verse-btn.selected {
-		border: 2px solid #000000;
-	}
-
-	.chapter-dropdown {
-		padding: 10px;
-		margin: 0 auto;
-		text-align: center;
-	}
-
-	.loader-container {
-		margin-top: 200px;
-	}
-
-	.verse-item {
-		margin-bottom: 5px;
-	}
-
-	.verse-btn {
-		all: unset;
-		cursor: pointer;
-		background-color: #212529;
-		color: #f8f9fa;
-		padding: 8px;
-		border-radius: 4px;
-		width: 100%;
-		display: block;
-		text-align: left;
-	}
-	.verse-btn:hover {
-		background-color: #495057;
-	}
-	.verse-btn.selected {
-		background-color: #198754;
-		color: #fff;
-	}
-
-	/* Modal estilos */
-	.modal {
-		position: fixed;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		background-color: rgba(0, 0, 0, 0.6);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-	}
-
-	.modal-content {
-		background-color: rgba(255, 255, 255, 0);
-		padding: 20px;
-		border-radius: 8px;
-		max-width: 600px;
-		width: 90%;
-		text-align: center;
-	}
-
-	.modal-verse-list {
-		max-height: 300px;
-
-		padding: 0;
-		list-style: none;
-		margin: 20px 0;
-	}
-
-	.modal-verse-item button {
-		all: unset;
-		cursor: pointer;
-		display: block;
-		width: 100%;
-		padding: 8px;
-		margin-bottom: 5px;
-		background-color: #f8f9fa;
-		border: 1px solid #dee2e6;
-		border-radius: 4px;
-	}
-	.modal-verse-item button:hover {
-		background-color: #e9ecef;
-	}
-
-	.close-btn {
-		margin-top: 20px;
-		padding: 10px 20px;
-		background-color: #dc3545;
-		color: white;
-		border: none;
-		border-radius: 5px;
-		cursor: pointer;
-	}
-	.close-btn:hover {
-		background-color: #c82333;
-	}
-	.sticky-actions {
-		position: sticky;
-		top: 5px;
-		z-index: 1000;
-		padding: 10px;
-	}
-
-	@media (max-width: 768px) {
-		.sticky-actions {
-			flex-wrap: wrap;
-			gap: 10px;
-			justify-content: center; /* Centra los botones de acciones en pantallas móviles */
-		}
-
-		.verse-btn {
-			text-align: center;
-		}
-
-		.modal-content {
-			padding: 15px;
-			font-size: 14px; /* Ajusta el tamaño de texto para pantallas más pequeñas */
-		}
-
-		.modal-verse-list {
-			max-width: auto;
-		}
-		.verse-list {
-			padding: 0 10px; /* Ajusta el padding para pantallas pequeñas */
-		}
-
-		.verse-btn {
-			text-align: center; /* Centra el texto para pantallas más pequeñas */
-			font-size: 14px; /* Ajusta el tamaño del texto */
-		}
-
-		.verse-item {
-			margin-bottom: 8px;
-		}
-	}
-</style>
