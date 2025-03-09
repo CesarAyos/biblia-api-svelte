@@ -1,7 +1,5 @@
 // Configuración global para evitar valores duplicados y centralizar configuraciones
 const CONFIG = {
-  dbName: "BibleCache",
-  cacheObjectStore: "cache",
   apiBaseUrl: "https://bible-api.deno.dev/api",
 };
 
@@ -54,160 +52,46 @@ export type SearchData = {
   take: number; // Resultados por página
 };
 
-// Función para abrir la base de datos de IndexedDB
-function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    // Verificar si estamos en el navegador
-    if (typeof window === "undefined" || !window.indexedDB) {
-      reject(new Error("indexedDB no está disponible en este entorno."));
-      return;
-    }
-
-    const request = indexedDB.open(CONFIG.dbName, 1);
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(CONFIG.cacheObjectStore)) {
-        db.createObjectStore(CONFIG.cacheObjectStore, { keyPath: "key" });
-        console.log("Almacén de objetos 'cache' creado");
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-// Función para guardar datos en IndexedDB
-async function saveToIndexedDB(key: string, data: any): Promise<void> {
+// Función para obtener datos de la API
+async function fetchFromAPI<T>(url: string): Promise<T> {
+  console.log(`Descargando datos desde la API: ${url}`);
   try {
-    const db = await openDatabase();
-    const transaction = db.transaction(CONFIG.cacheObjectStore, "readwrite");
-    const store = transaction.objectStore(CONFIG.cacheObjectStore);
-
-    return new Promise((resolve, reject) => {
-      transaction.oncomplete = () => {
-        console.log(`Guardado en IndexedDB: clave=${key}`, data);
-        resolve();
-      };
-      transaction.onerror = () => {
-        console.error("Error en la transacción de IndexedDB:", transaction.error);
-        reject(transaction.error);
-      };
-      store.put({ key, data, timestamp: Date.now() });
-    });
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Error al obtener datos de la API: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
   } catch (error) {
-    console.error("Error inesperado guardando en IndexedDB:", error);
+    console.error(`Error al obtener datos de la API:`, error);
     throw error;
   }
 }
 
-// Función para recuperar datos de IndexedDB
-export async function getFromIndexedDB(key: string): Promise<any | null> {
-  try {
-    const db = await openDatabase();
-    const transaction = db.transaction(CONFIG.cacheObjectStore, "readonly");
-    const store = transaction.objectStore(CONFIG.cacheObjectStore);
-
-    return new Promise((resolve, reject) => {
-      const request = store.get(key);
-
-      request.onsuccess = () => {
-        console.log(`Recuperado de IndexedDB (clave=${key}):`, request.result);
-        resolve(request.result ? request.result.data : null);
-      };
-      request.onerror = () => reject(request.error);
-    });
-  } catch (error) {
-    console.error(`Error recuperando de IndexedDB con clave=${key}:`, error);
-    return null;
-  }
-}
-
-// Función para obtener datos de la API y guardar en IndexedDB si no existe
-async function fetchAndCache<T>(key: string, url: string): Promise<T> {
-  const cachedData = await getFromIndexedDB(key);
-  if (cachedData) {
-    console.log(`Datos obtenidos desde la caché (clave=${key})`);
-    return cachedData;
-  }
-
-  console.log(`Descargando datos desde la API: ${url}`);
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Error al obtener datos de la API: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  await saveToIndexedDB(key, data); // Guardar en IndexedDB
-  return data;
-}
-
 // Función para obtener las versiones de la Biblia
 export async function fetchVersions(): Promise<Version[]> {
-  const key = "bible_versions";
-  const cachedData = await getFromIndexedDB(key);
+  console.log("Obteniendo versiones desde la API...");
+  const versions = await fetchFromAPI<Version[]>(`${CONFIG.apiBaseUrl}/versions`);
+  console.log("Versiones obtenidas:", versions);
 
-  if (cachedData) {
-    console.log(`Versiones obtenidas desde la caché (clave=${key})`);
-    return cachedData;
-  }
-
-  console.log(`Descargando versiones desde la API...`);
-  const url = `${CONFIG.apiBaseUrl}/versions`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Error al obtener versiones de la API: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  await saveToIndexedDB(key, data); // Guardar en IndexedDB
-  return data;
+  // Eliminar el filtro para devolver todas las versiones
+  return versions;
 }
-
 // Función para obtener los libros de una versión
 export async function fetchBooks(version: string): Promise<Book[]> {
-  const key = `books_${version}`;
-  const cachedData = await getFromIndexedDB(key);
-
-  if (cachedData) {
-    console.log(`Libros obtenidos desde la caché (clave=${key})`);
-    return cachedData;
-  }
-
-  console.log(`Descargando libros para la versión ${version} desde la API...`);
-  const url = `${CONFIG.apiBaseUrl}/books?version=${version}`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Error al obtener libros de la API: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  await saveToIndexedDB(key, data); // Guardar en IndexedDB
-  return data;
+  return fetchFromAPI<Book[]>(`${CONFIG.apiBaseUrl}/books?version=${version}`);
 }
 
 // Función para obtener un capítulo
 export async function fetchChapter(version: string, book: string, chapter: number): Promise<ChapterData> {
-  const key = `chapter_${version}_${book}_${chapter}`;
-  const cachedData = await getFromIndexedDB(key);
+  const cachedData = getFromLocalStorage(version, book, chapter);
   if (cachedData) {
-    console.log(`Capítulo obtenido desde la caché (clave=${key})`);
+    console.log(`Datos obtenidos del localStorage: ${version}-${book}-${chapter}`);
     return cachedData;
   }
 
-  console.warn(`El capítulo ${chapter} del libro ${book} (versión ${version}) no está en la caché. Descargando desde la API...`);
   const url = `${CONFIG.apiBaseUrl}/read/${version}/${book}/${chapter}`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Error al obtener datos de la API: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  await saveToIndexedDB(key, data); // Guardar en IndexedDB
+  const data = await fetchFromAPI<ChapterData>(url);
+  saveToLocalStorage(version, book, chapter, data);
   return data;
 }
 
@@ -217,112 +101,46 @@ export async function fetchSearch(version: string, query: string, take: number =
     throw new Error("Los parámetros 'version' y 'query' son obligatorios.");
   }
 
-  const key = `search_${version}_${query}_${take}_${page}`;
-  const cachedData = await getFromIndexedDB(key);
-  if (cachedData) {
-    console.log(`Resultados de búsqueda obtenidos desde la caché (clave=${key})`);
-    return cachedData;
-  }
-
   const url = `${CONFIG.apiBaseUrl}/read/${version}/search?q=${encodeURIComponent(query)}&take=${take}&page=${page}`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Error al realizar la búsqueda: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  await saveToIndexedDB(key, data); // Guardar en IndexedDB
-  return data;
-}
-
-// Función para guardar capítulos en IndexedDB
-async function saveChapterToIndexedDB(chapterKey: string, verses: any[]): Promise<void> {
-  try {
-    const db = await openDatabase();
-    const transaction = db.transaction(CONFIG.cacheObjectStore, "readwrite");
-    const store = transaction.objectStore(CONFIG.cacheObjectStore);
-
-    for (const verse of verses) {
-      const key = `${chapterKey}_verse_${verse.number}`;
-      store.put({ key, data: verse, timestamp: Date.now() });
-    }
-
-    return new Promise((resolve, reject) => {
-      transaction.oncomplete = () => {
-        console.log(`Capítulo completo guardado con versículos individuales: ${chapterKey}`);
-        resolve();
-      };
-      transaction.onerror = () => {
-        console.error("Error en la transacción de IndexedDB:", transaction.error);
-        reject(transaction.error);
-      };
-    });
-  } catch (error) {
-    console.error("Error inesperado al guardar versículos en IndexedDB:", error);
-    throw error;
-  }
+  return fetchFromAPI<SearchData>(url);
 }
 
 // Función para descargar múltiples capítulos en paralelo con límite de concurrencia
 async function downloadChaptersInParallel(
   version: string,
   book: Book,
-  forceDownload: boolean = false, // Forzar descarga incluso si ya está en la caché
   concurrencyLimit: number = 5
 ): Promise<void> {
   const chaptersToDownload = Array.from({ length: book.chapters }, (_, i) => i + 1);
 
   // Función para descargar un capítulo específico
   const downloadChapter = async (chapter: number): Promise<void> => {
-    const cacheKey = `chapter_${version}_${book.abrev}_${chapter}`;
-
-    // Si no se fuerza la descarga, verificar si el capítulo ya está en la caché
-    if (!forceDownload) {
-      const cachedData = await getFromIndexedDB(cacheKey);
-      if (cachedData) {
-        console.log(`Capítulo ${chapter} del libro ${book.abrev} ya está en la caché.`);
-        return;
-      }
-    }
-
     try {
-      // Descargar el capítulo desde la API
-      const url = `${CONFIG.apiBaseUrl}/read/${version}/${book.abrev}/${chapter}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`Error al obtener datos de la API: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      await saveToIndexedDB(cacheKey, data); // Guardar en IndexedDB
-      console.log(`Guardado capítulo ${chapter} del libro ${book.abrev} (${version})`);
+      const data = await fetchChapter(version, book.abrev, chapter);
+      saveToLocalStorage(version, book.abrev, chapter, data); // Guardar en localStorage
+      console.log(`Descargado y guardado capítulo ${chapter} del libro ${book.abrev} (${version})`);
     } catch (error) {
-      console.error(`Error al guardar el capítulo ${chapter} del libro ${book.abrev}:`, error);
-      throw error; // Relanzar el error para manejarlo en la función principal
+      console.error(`Error al descargar el capítulo ${chapter} del libro ${book.abrev}:`, error);
+      throw error;
     }
   };
 
   // Función para manejar la concurrencia
   const runWithConcurrency = async (tasks: (() => Promise<void>)[], limit: number): Promise<void> => {
-    const executing = new Set<Promise<void>>(); // Set de promesas en ejecución
+    const executing = new Set<Promise<void>>();
 
     for (const task of tasks) {
-      // Crear una promesa que se resuelve cuando la tarea termina
       const promise = task().then(() => {
-        executing.delete(promise); // Eliminar la promesa del conjunto cuando termine
+        executing.delete(promise);
       });
 
-      executing.add(promise); // Añadir la promesa al conjunto
+      executing.add(promise);
 
-      // Si se alcanza el límite de concurrencia, esperar a que alguna promesa termine
       if (executing.size >= limit) {
-        await Promise.race(executing); // Esperar a que la primera promesa termine
+        await Promise.race(executing);
       }
     }
 
-    // Esperar a que todas las promesas restantes terminen
     await Promise.all(executing);
   };
 
@@ -336,7 +154,7 @@ async function downloadChaptersInParallel(
 // Función para precargar toda la Biblia con paralelismo
 export async function preloadFullBible(setProgress: (progress: number) => void): Promise<void> {
   try {
-    const versions = await fetchVersions(); // Obtener versiones
+    const versions = await fetchVersions(); // Obtener todas las versiones
     let totalChapters = 0;
 
     // Calcular el número total de capítulos
@@ -354,7 +172,7 @@ export async function preloadFullBible(setProgress: (progress: number) => void):
       const books = await fetchBooks(version.version);
 
       for (const book of books) {
-        await downloadChaptersInParallel(version.version, book, true); // Forzar descarga
+        await downloadChaptersInParallel(version.version, book); // Descargar capítulos
 
         // Actualizar progreso
         currentChapter += book.chapters;
@@ -363,60 +181,25 @@ export async function preloadFullBible(setProgress: (progress: number) => void):
       }
     }
 
-    console.log("Toda la Biblia ha sido descargada y almacenada en el caché.");
+    console.log("Toda la Biblia ha sido descargada y guardada en localStorage.");
   } catch (error) {
     console.error("Error durante la precarga de la Biblia:", error);
     throw error; // Relanzar el error para manejarlo en initializeApp
   }
 }
 
-// Función para verificar si toda la Biblia está descargada
-export async function isBibleFullyDownloaded(): Promise<boolean> {
-  try {
-    const versions = await fetchVersions();
-    for (const version of versions) {
-      const books = await fetchBooks(version.version); // Obtener libros
-      for (const book of books) {
-        for (let chapter = 1; chapter <= book.chapters; chapter++) {
-          const cacheKey = `chapter_${version.version}_${book.abrev}_${chapter}`;
-          const cachedData = await getFromIndexedDB(cacheKey);
-          if (!cachedData) {
-            console.warn(`Falta el capítulo ${chapter} del libro ${book.abrev} en la versión ${version.version}`);
-            return false;
-          }
-        }
-      }
-    }
-    console.log("La Biblia está completamente descargada y almacenada.");
-    return true;
-  } catch (error) {
-    console.error("Error al verificar si la Biblia está descargada:", error);
-    return false;
-  }
-}
-
 // Función para inicializar la aplicación
 export async function initializeApp(
-  setProgress: (progress: number) => void,
-  version?: string // Versión específica a descargar (opcional)
+  setProgress: (progress: number) => void
 ): Promise<void> {
-  console.log("Iniciando la aplicación y verificando la caché...");
+  console.log("Iniciando la aplicación...");
 
   try {
-    const versions = version ? [{ version }] : await fetchVersions(); // Si se especifica una versión, usarla
+    const versionsToDownload = await fetchVersions(); // Obtener solo las versiones filtradas
 
-    for (const versionData of versions) {
-      const isComplete = await isVersionFullyDownloaded(versionData.version);
-      if (isComplete) {
-        console.log(`La versión ${versionData.version} ya está descargada.`);
-        continue;
-      }
-
+    for (const versionData of versionsToDownload) {
       console.log(`Precargando la versión ${versionData.version}...`);
-      await preloadVersion(versionData.version, setProgress); // Precargar solo la versión sele // Precargar solo la versión seleccionada
-
-      // Actualizar el estado en localStorage
-      localStorage.setItem(`bibleDownloaded_${versionData.version}`, 'true');
+      await preloadVersion(versionData.version, setProgress);
     }
 
     console.log("Descarga completada.");
@@ -426,30 +209,22 @@ export async function initializeApp(
   }
 }
 
-export async function isVersionFullyDownloaded(version: string): Promise<boolean> {
-  try {
-    const books = await fetchBooks(version);
-    for (const book of books) {
-      for (let chapter = 1; chapter <= book.chapters; chapter++) {
-        const cacheKey = `chapter_${version}_${book.abrev}_${chapter}`;
-        const cachedData = await getFromIndexedDB(cacheKey);
-        if (!cachedData) {
-          console.warn(`Falta el capítulo ${chapter} del libro ${book.abrev} en la versión ${version}`);
-          return false;
-        }
-      }
-    }
-    console.log(`La versión ${version} está completamente descargada y almacenada.`);
-    return true;
-  } catch (error) {
-    console.error(`Error al verificar si la versión ${version} está descargada:`, error);
-    return false;
-  }
+// Función para limpiar el localStorage antes de descargar una nueva versión
+function clearLocalStorage(): void {
+  localStorage.clear();
+  console.log("localStorage limpiado.");
 }
 
-async function preloadVersion(version: string, setProgress: (progress: number) => void): Promise<void> {
+
+// Función para precargar una versión específica
+export async function preloadVersion(
+  version: string,
+  setProgress: (progress: number) => void
+): Promise<void> {
   try {
-    const books = await fetchBooks(version);
+    clearLocalStorage(); // Limpiar localStorage antes de descargar
+
+    const books = await fetchBooks(version); // Obtener los libros de la versión seleccionada
     let totalChapters = 0;
 
     // Calcular el número total de capítulos
@@ -461,7 +236,7 @@ async function preloadVersion(version: string, setProgress: (progress: number) =
 
     // Descargar y guardar cada capítulo en paralelo
     for (const book of books) {
-      await downloadChaptersInParallel(version, book, true); // Forzar descarga
+      await downloadChaptersInParallel(version, book); // Descargar capítulos
 
       // Actualizar progreso
       currentChapter += book.chapters;
@@ -469,26 +244,67 @@ async function preloadVersion(version: string, setProgress: (progress: number) =
       setProgress(progress); // Llamada al callback para actualizar el progreso
     }
 
-    console.log(`Versión ${version} descargada y almacenada en el caché.`);
+    console.log(`Versión ${version} descargada y guardada en localStorage.`);
   } catch (error) {
     console.error(`Error durante la precarga de la versión ${version}:`, error);
     throw error;
   }
 }
 
+// Función para guardar datos en localStorage
+function saveToLocalStorage(version: string, book: string, chapter: number, data: ChapterData): void {
+  const key = `${version}-${book}-${chapter}`;
+  const compressedData = compressData(data);
+  localStorage.setItem(key, compressedData);
+}
 
-// Función para validar si la descarga está completa
-export async function validateDownloadComplete(): Promise<boolean> {
+// Función para obtener datos de localStorage
+function getFromLocalStorage(version: string, book: string, chapter: number): ChapterData | null {
+  const key = `${version}-${book}-${chapter}`;
+  const compressedData = localStorage.getItem(key);
+  return compressedData ? decompressData(compressedData) : null;
+}
+
+// Función para mostrar un selector de versiones
+export async function showVersionSelector(): Promise<string> {
+  const versions = await fetchVersions(); // Obtener todas las versiones disponibles
+
+  // Aquí podrías implementar la lógica para mostrar un selector de versiones en la UI
+  // Por simplicidad, asumimos que el usuario selecciona la primera versión
+  const selectedVersion = versions[0].version; // Cambia esto según la lógica de tu UI
+
+  return selectedVersion;
+}
+
+// Función para inicializar la aplicación con la versión seleccionada
+// Función principal para inicializar la aplicación con la versión seleccionada
+export async function initializeAppWithSelectedVersion(
+  setProgress: (progress: number) => void
+): Promise<void> {
+  console.log("Iniciando la aplicación con la versión seleccionada...");
+
   try {
-    const isComplete = await isBibleFullyDownloaded(); // Verifica si todos los datos están en IndexedDB
-    if (isComplete) {
-      console.log("Validación completa: Toda la Biblia está descargada.");
-    } else {
-      console.warn("Faltan algunos capítulos. Verifica los datos.");
-    }
-    return isComplete;
+    const selectedVersion = await showVersionSelector(); // Mostrar selector de versiones
+    console.log(`Versión seleccionada: ${selectedVersion}`);
+
+    // Precargar solo la versión seleccionada
+    await preloadVersion(selectedVersion, setProgress);
+
+    console.log("Descarga completada.");
   } catch (error) {
-    console.error("Error al validar la descarga:", error);
-    return false;
+    console.error("Error durante la inicialización de la aplicación:", error);
+    throw error;
   }
 }
+
+// Función para comprimir datos antes de guardar en localStorage
+function compressData(data: ChapterData): string {
+  // Aquí podrías usar una librería de compresión como LZString
+  return JSON.stringify(data); // Por ahora, simplemente convertimos a JSON
+}
+
+// Función para descomprimir datos al leer de localStorage
+function decompressData(compressedData: string): ChapterData {
+  return JSON.parse(compressedData); // Por ahora, simplemente parseamos el JSON
+}
+
