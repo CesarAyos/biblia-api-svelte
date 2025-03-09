@@ -40,6 +40,20 @@
 		localStorage.setItem(`markedVerses-${selectedBook}-${selectedChapter}`, JSON.stringify(selectedVerses));
 	}
 
+	// Obtener datos del localStorage
+	function getFromLocalStorage(version: string, book: string, chapter: number): ChapterData | null {
+		const key = `${version}-${book}-${chapter}`;
+		const compressedData = localStorage.getItem(key);
+		return compressedData ? JSON.parse(compressedData) : null; // Descomprimir datos
+	}
+
+	// Guardar datos en localStorage
+	function saveToLocalStorage(version: string, book: string, chapter: number, data: ChapterData): void {
+		const key = `${version}-${book}-${chapter}`;
+		const compressedData = JSON.stringify(data); // Comprimir datos
+		localStorage.setItem(key, compressedData);
+	}
+
 	function goToVerse(verseNumber: number) {
 		const verseElement = document.getElementById(`verse-${verseNumber}`);
 		if (verseElement) {
@@ -62,12 +76,25 @@
 		selectedVerses = [];
 		feedbackMessage = null;
 
+		// Intentar cargar desde localStorage
+		const cachedData = getFromLocalStorage(selectedVersion, selectedBook.toLowerCase(), selectedChapter);
+		if (cachedData) {
+			console.log(`Datos obtenidos del localStorage: ${selectedVersion}-${selectedBook}-${selectedChapter}`);
+			chapterData = cachedData;
+			loadMarkedVerses(); // Cargar versículos marcados al cargar el capítulo
+			showModal = true;
+			isLoading = false;
+			return;
+		}
+
+		// Si no hay datos en localStorage, hacer la solicitud a la API
 		try {
 			chapterData = await fetchChapter(
 				selectedVersion,
 				selectedBook.toLowerCase(),
 				selectedChapter
 			);
+			saveToLocalStorage(selectedVersion, selectedBook.toLowerCase(), selectedChapter, chapterData); // Guardar en localStorage
 			loadMarkedVerses(); // Cargar versículos marcados al cargar el capítulo
 			showModal = true;
 		} catch (err) {
