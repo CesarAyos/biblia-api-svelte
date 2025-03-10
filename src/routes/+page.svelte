@@ -34,7 +34,7 @@
 	let downloadProgress = 0;
 	let statusMessage = '';
 
-	const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF'];
+	const colors = ['rgba(255, 0, 0, 0.2)', 'rgba(0, 255, 0, 0.2)', 'rgba(0, 0, 255, 0.2)', 'rgba(255, 255, 0, 0.2)', 'rgba(255, 0, 255, 0.2)'];
 
 	// Verificar disponibilidad de localStorage
 	function isLocalStorageAvailable() {
@@ -244,93 +244,81 @@
 </script>
 
 <main
-	class="{$darkMode
-		? 'bg-dark text-warning border-warning'
-		: 'bg-light text-dark border-dark'} p-2"
-		style="border: 8px groove #ff6550;text-shadow: 3px 12px 7px rgba(0,0,0,0.6);"
+	class="{$darkMode ? 'bg-dark text-warning border-warning' : 'bg-light text-dark border-dark'} p-2"
+	style="border: 8px groove #ff6550; text-shadow: 3px 12px 7px rgba(0,0,0,0.6); min-height: 100vh; overflow: auto;"
 >
 	<!-- Barra de navegación -->
 	<div class:dark-mode={$darkMode}>
 		<div class="d-flex justify-content-center p-2 {$darkMode ? 'bg-dark' : 'bg-light'} ">
-			
-				<p class="navbar-brand {$darkMode ? 'text-warning' : 'text-dark'} fs-3 fw-bold">
-					<i class="bi bi-book"></i> Biblia <strong>{selectedVersion || ''}</strong>
-				</p>
-			
+			<p class="navbar-brand {$darkMode ? 'text-warning' : 'text-dark'} fs-3 fw-bold">
+				<i class="bi bi-book"></i> Biblia <strong>{selectedVersion || ''}</strong>
+			</p>
 		</div>
 
-		
-			<div class="navbar-nav me-auto mb-2 mb-lg-0">
-				<li class="nav-item">
-					<div class="d-flex flex-column flex-lg-row align-items-center">
-						<!-- Selector de versión -->
+		<div class="navbar-nav me-auto mb-2 mb-lg-0">
+			<li class="nav-item">
+				<div class="d-flex flex-column flex-lg-row align-items-center">
+					<!-- Selector de versión -->
+					<select
+						class="form-select form-select-sm {$darkMode
+							? 'bg-dark text-warning border-warning'
+							: 'bg-light text-dark border-dark'} me-2 mb-2 mb-lg-0"
+						bind:value={selectedVersion}
+					>
+						<option value="" disabled selected>Elige una versión</option>
+						{#each versions as version}
+							<option value={version.version}>{version.name}</option>
+						{/each}
+					</select>
+
+					<!-- Selector de libros -->
+					{#if selectedVersion && books.length > 0}
+						<p class="{$darkMode ? 'text-warning' : 'text-dark'} me-2 mb-2 mb-lg-0">Libro:</p>
 						<select
 							class="form-select form-select-sm {$darkMode
 								? 'bg-dark text-warning border-warning'
-								: 'bg-light text-dark border-dark'} me-2 mb-2 mb-lg-0"
-							bind:value={selectedVersion}
+								: 'bg-light text-dark border-dark'}"
+							bind:value={selectedBook}
 						>
-							<option value="" disabled selected>Elige una versión</option>
-							{#each versions as version}
-								<option value={version.version}>{version.name}</option>
+							<option value="" disabled selected>Elige un libro</option>
+							{#each books as book}
+								<option value={book.abrev}>{book.names[0]}</option>
 							{/each}
 						</select>
-
-						<!-- Selector de libros -->
-						{#if selectedVersion && books.length > 0}
-							<p class="{$darkMode ? 'text-warning' : 'text-dark'} me-2 mb-2 mb-lg-0">
-								Libro:
-							</p>
-							<select
-								class="form-select form-select-sm {$darkMode
-									? 'bg-dark text-warning border-warning'
-									: 'bg-light text-dark border-dark'}"
-								bind:value={selectedBook}
-							>
-								<option value="" disabled selected>Elige un libro</option>
-								{#each books as book}
-									<option value={book.abrev}>{book.names[0]}</option>
-								{/each}
-							</select>
-						{:else if selectedVersion}
-							<span
-								class="spinner-border {$darkMode ? 'text-warning' : 'text-dark'} spinner-border-sm"
-								role="status"
-							></span>
-						{:else}
-							<p class={$darkMode ? 'text-warning' : 'text-dark'}>
-								Selecciona una versión primero
-							</p>
-						{/if}
-					</div>
-					{#if selectedBook && bookDetails}
+					{:else if selectedVersion}
+						<span
+							class="spinner-border {$darkMode ? 'text-warning' : 'text-dark'} spinner-border-sm"
+							role="status"
+						></span>
+					{:else}
+						<p class={$darkMode ? 'text-warning' : 'text-dark'}>Selecciona una versión primero</p>
+					{/if}
+				</div>
+				{#if selectedBook && bookDetails}
 					<p class="text-center {$darkMode ? 'text-warning' : 'text-dark'} me-2 mb-2 mb-lg-0">
 						Capitulo:
 					</p>
-						<div class="chapter-dropdown">
-							<select
-								class="form-select form-select-sm {$darkMode
-									? 'bg-dark text-warning border-warning'
-									: 'bg-light text-dark border-dark'}"
-								bind:value={selectedChapter}
-								on:change={loadChapter}
-								disabled={isLoading}
-							>
-								<option value="" disabled selected>Selecciona un capítulo</option>
-								{#each Array(bookDetails.chapters)
-									.fill(0)
-									.map((_, i) => i + 1) as chapter}
-									<option value={chapter}>Capítulo {chapter}</option>
-								{/each}
-							</select>
-						</div>
-					{/if}
+					<div class="chapter-dropdown">
+						<select
+							class="form-select form-select-sm {$darkMode
+								? 'bg-dark text-warning border-warning'
+								: 'bg-light text-dark border-dark'}"
+							bind:value={selectedChapter}
+							on:change={loadChapter}
+							disabled={isLoading}
+						>
+							<option value="" disabled selected>Selecciona un capítulo</option>
+							{#each Array(bookDetails.chapters)
+								.fill(0)
+								.map((_, i) => i + 1) as chapter}
+								<option value={chapter}>Capítulo {chapter}</option>
+							{/each}
+						</select>
+					</div>
+				{/if}
+			</li>
+		</div>
 
-					
-				</li>
-			</div>
-		
-		
 		<div>
 			{#if chapterData && chapterData.vers?.length > 0}
 				<div class="verse-list p-4">
@@ -340,12 +328,10 @@
 								type="button"
 								class="verse-list {$darkMode
 									? 'bg-dark text-warning border-warning'
-									: 'bg-light text-dark border-dark'}{selectedVerses.find((v) => v.number === verse.number)
-									? 'selected'
-									: ''}"
-								style="text-shadow: 2px 12px 5px rgba(0,0,0,0.6);;border: none; outline: none; background-color: {selectedVerses.find(
+									: 'bg-light text-dark border-dark'}"
+								style="text-shadow: 2px 12px 5px rgba(0,0,0,0.6); border: none; outline: none; background-color: {selectedVerses.find(
 									(v) => v.number === verse.number
-								)?.color || 'transparent'}"
+								)?.color || 'transparent'} !important;"
 								on:click={() => toggleVerseSelection(verse.number, verse.verse)}
 							>
 								<strong class="verse-number">{verse.number}:</strong>
@@ -419,7 +405,7 @@
 
 	<!-- Modal -->
 	{#if showModal}
-		<div class="modal ">
+		<div class="modal">
 			<div class="modal-content">
 				{#if chapterData}
 					<ul class="modal-verse-list">
@@ -429,7 +415,6 @@
 									class="fs-3 form-select form-select-sm {$darkMode
 										? 'bg-dark text-warning border-warning'
 										: 'bg-light text-dark border-dark'}"
-										
 									type="button"
 									on:click={() => goToVerse(verse.number)}
 								>
@@ -456,7 +441,6 @@
 		--text-color: white;
 	}
 
-
 	.floating-buttons {
 		z-index: 1000;
 	}
@@ -479,8 +463,6 @@
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		
-	
 	}
 
 	.modal-content {
@@ -490,6 +472,7 @@
 		border-radius: 0.5rem;
 		max-width: 100%;
 		max-height: 90%;
-		
 	}
+
+	
 </style>
