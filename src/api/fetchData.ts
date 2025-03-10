@@ -38,7 +38,7 @@ async function fetchFromAPI<T>(url: string): Promise<T> {
     }
     return await response.json();
   } catch (error) {
-    console.error(`Error al obtener datos de la API:`, error);
+    // console.error(`Error al obtener datos de la API:`, error);
     throw error;
   }
 }
@@ -63,7 +63,7 @@ async function downloadChaptersInParallel(
     try {
       const data = await fetchChapter(version, book.abrev, chapter);
       saveToLocalStorage(version, book.abrev, chapter, data);
-      console.log(`Descargado y guardado: ${version}-${book.abrev}-${chapter}`);
+      // console.log(`Descargado y guardado: ${version}-${book.abrev}-${chapter}`);
     } catch (error) {
       console.error(`Error al descargar el capítulo ${chapter} del libro ${book.abrev}:`, error);
       throw error;
@@ -129,7 +129,7 @@ export async function preloadVersion(
       currentChapter += book.chapters;
     }
 
-    console.log(`Versión ${version} descargada y guardada en localStorage.`);
+    // console.log(`Versión ${version} descargada y guardada en localStorage.`);
   } catch (error) {
     console.error(`Error durante la precarga de la versión ${version}:`, error);
     throw error;
