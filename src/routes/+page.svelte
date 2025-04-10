@@ -21,6 +21,12 @@
 	let isOnline = true;
 	let isBibleDownloaded = false;
 
+	// Variables para comparación
+	let compareMode = false;
+	let secondVersion = 'NVI';
+	let secondBibleData: Book | null = null;
+	let secondCurrentChapter: Chapter | null = null;
+
 	// Listas de selección
 	const versions = [
 		'DHH94I',
@@ -140,40 +146,71 @@
 		}
 	}
 
+	// Cargar la segunda versión para comparación
+	async function loadSecondBible(version: string, book: string) {
+		try {
+			const url = `/${version}/${book}.json`;
+			
+			if (isOnline) {
+				const response = await fetch(url);
+				if (!response.ok) throw new Error(`Error ${response.status}`);
+				secondBibleData = await response.json();
+			} else {
+				const cache = await caches.open('bible-cache');
+				const cachedResponse = await cache.match(url);
+				if (cachedResponse) {
+					secondBibleData = await cachedResponse.json();
+				} else {
+					throw new Error('Libro no disponible offline');
+				}
+			}
+		} catch (error) {
+			console.error('Error cargando segunda versión:', error);
+			secondBibleData = null;
+		}
+	}
+
 	// Cargar datos de la Biblia
 	async function loadBible(version: string, book: string) {
 		try {
 			isLoading = true;
 			const url = `/${version}/${book}.json`;
 
-			// Primero intentar con fetch normal
+			// Cargar versión principal
 			if (isOnline) {
 				const response = await fetch(url);
-				if (!response.ok) throw new Error(`Error ${response.status}: Archivo no encontrado`);
+				if (!response.ok) throw new Error(`Error ${response.status}`);
 				bibleData = await response.json();
 			} else {
-				// Si estamos offline, buscar en caché
 				const cache = await caches.open('bible-cache');
 				const cachedResponse = await cache.match(url);
-
 				if (cachedResponse) {
 					bibleData = await cachedResponse.json();
 				} else {
-					throw new Error(
-						'Libro no disponible offline. Por favor conéctate a internet para descargarlo.'
-					);
+					throw new Error('Libro no disponible offline');
 				}
+			}
+
+			// Si está en modo comparación, cargar segunda versión
+			if (compareMode) {
+				await loadSecondBible(secondVersion, book);
 			}
 
 			selectedVerse = null;
 		} catch (error) {
 			console.error('Error cargando la Biblia:', error);
 			bibleData = null;
-			if (!isOnline) {
-				alert('No estás conectado a internet y este libro no está disponible offline.');
-			}
+			secondBibleData = null;
 		} finally {
 			isLoading = false;
+		}
+	}
+
+	// Alternar modo de comparación
+	function toggleCompareMode() {
+		compareMode = !compareMode;
+		if (compareMode) {
+			loadSecondBible(secondVersion, selectedBook);
 		}
 	}
 
@@ -228,6 +265,11 @@
 			bibleData?.chapters?.find((ch) => ch.chapter_usfm?.endsWith(selectedChapter)) || null;
 	}
 
+	$: if (secondBibleData && selectedChapter) {
+		secondCurrentChapter =
+			secondBibleData?.chapters?.find((ch) => ch.chapter_usfm?.endsWith(selectedChapter)) || null;
+	}
+
 	$: filteredVersions = filterOptions(versions, searchTerm);
 	$: filteredBooks = filterOptions(books, searchTerm);
 	$: filteredChapters = filterOptions(getChaptersForCurrentBook(), searchTerm);
@@ -271,6 +313,10 @@
                                 <span class="d-block d-md-inline">{getBookFullName(selectedBook)}</span>
                                 <span class="d-none d-md-inline mx-2">-</span>
                                 <span class="d-block d-md-inline">{selectedVersion}</span>
+                                {#if compareMode}
+                                    <span class="d-none d-md-inline mx-2">vs</span>
+                                    <span class="d-block d-md-inline">{secondVersion}</span>
+                                {/if}
                                 <span class="d-none d-md-inline mx-2">-</span>
                                 <span class="d-block d-md-inline">Capítulo {selectedChapter}</span>
                                 {#if selectedVerse}
@@ -322,8 +368,8 @@
                             </div>
                         {/if}
 
-                        <!-- Selector de versión/libro/capítulo/versículo -->
-                        <div class="d-flex justify-content-center mb-4">
+                        <!-- Selector y botón de comparación -->
+                        <div class="d-flex justify-content-between mb-3">
                             <button
                                 class="btn btn-primary dropdown-toggle"
                                 on:click={() => {
@@ -333,7 +379,34 @@
                             >
                                 <i class="bi bi-gear-fill me-2"></i>Seleccionar
                             </button>
+                            
+                            <button 
+                                class="btn {compareMode ? 'btn-outline-danger' : 'btn-outline-primary'}"
+                                on:click={toggleCompareMode}
+                            >
+                                {#if compareMode}
+                                    <i class="bi bi-x-circle me-2"></i>Salir de comparación
+                                {:else}
+                                    <i class="bi bi-file-diff me-2"></i>Comparar versiones
+                                {/if}
+                            </button>
                         </div>
+
+                        <!-- Selector de segunda versión cuando esté en modo comparación -->
+                        {#if compareMode && showSelectorDropdown === false}
+                            <div class="mb-3">
+                                <label class="form-label">Comparar con:</label>
+                                <select 
+                                    class="form-select" 
+                                    bind:value={secondVersion}
+                                    on:change={() => loadSecondBible(secondVersion, selectedBook)}
+                                >
+                                    {#each versions.filter(v => v !== selectedVersion) as version}
+                                        <option value={version}>{version}</option>
+                                    {/each}
+                                </select>
+                            </div>
+                        {/if}
 
                         {#if showSelectorDropdown}
                             <div class="selector-dropdown shadow-lg">
@@ -448,21 +521,65 @@
                         <!-- Contenido bíblico -->
                         {#if bibleData && currentChapter}
                             <div class="bg-white p-4 rounded shadow-sm bible-content">
-                                <div class="bible-text fs-5">
-                                    {#each currentChapter?.items as item}
-                                        {#if item.type === 'verse'}
-                                            <div
-                                                class="verse mb-3 p-3 bg-light rounded"
-                                                id={'verse-' + item.verse_numbers[0]}
-                                            >
-                                                <sup class="verse-number badge bg-primary me-2"
-                                                    >{item.verse_numbers.join(', ')}</sup
-                                                >
-                                                <span class="verse-text">{item.lines.join(' ')}</span>
+                                {#if compareMode && secondCurrentChapter}
+                                    <!-- Modo comparación - dos columnas -->
+                                    <div class="row">
+                                        <div class="col-md-6 pe-md-3 border-end">
+                                            <h5 class="text-center text-primary mb-3">{selectedVersion}</h5>
+                                            <div class="bible-text fs-5 scroll-sync">
+                                                {#each currentChapter?.items as item}
+                                                    {#if item.type === 'verse'}
+                                                        <div
+                                                            class="verse mb-3 p-3 bg-light rounded {selectedVerse?.toString() === item.verse_numbers[0].toString() ? 'verse-difference' : ''}"
+                                                            id={'verse-' + item.verse_numbers[0]}
+                                                        >
+                                                            <sup class="verse-number badge bg-primary me-2"
+                                                                >{item.verse_numbers.join(', ')}</sup
+                                                            >
+                                                            <span class="verse-text">{item.lines.join(' ')}</span>
+                                                        </div>
+                                                    {/if}
+                                                {/each}
                                             </div>
-                                        {/if}
-                                    {/each}
-                                </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6 ps-md-3">
+                                            <h5 class="text-center text-primary mb-3">{secondVersion}</h5>
+                                            <div class="bible-text fs-5 scroll-sync">
+                                                {#each secondCurrentChapter?.items as item}
+                                                    {#if item.type === 'verse'}
+                                                        <div
+                                                            class="verse mb-3 p-3 bg-light rounded {selectedVerse?.toString() === item.verse_numbers[0].toString() ? 'verse-difference' : ''}"
+                                                            id={'verse2-' + item.verse_numbers[0]}
+                                                        >
+                                                            <sup class="verse-number badge bg-primary me-2"
+                                                                >{item.verse_numbers.join(', ')}</sup
+                                                            >
+                                                            <span class="verse-text">{item.lines.join(' ')}</span>
+                                                        </div>
+                                                    {/if}
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    </div>
+                                {:else}
+                                    <!-- Modo normal - una sola versión -->
+                                    <div class="bible-text fs-5">
+                                        {#each currentChapter?.items as item}
+                                            {#if item.type === 'verse'}
+                                                <div
+                                                    class="verse mb-3 p-3 bg-light rounded"
+                                                    id={'verse-' + item.verse_numbers[0]}
+                                                >
+                                                    <sup class="verse-number badge bg-primary me-2"
+                                                        >{item.verse_numbers.join(', ')}</sup
+                                                    >
+                                                    <span class="verse-text">{item.lines.join(' ')}</span>
+                                                </div>
+                                            {/if}
+                                        {/each}
+                                    </div>
+                                {/if}
                             </div>
                         {:else}
                             <div class="text-center py-5">
@@ -586,6 +703,18 @@
         line-height: 1.5rem;
     }
 
+    /* Estilos para el modo de comparación */
+    .scroll-sync {
+        height: 60vh;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+    }
+
+    .verse-difference {
+        background-color: #fff8e1;
+        border-left: 3px solid #ffc107;
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
         .bible-text {
@@ -601,6 +730,10 @@
         .nav-tabs .nav-item {
             font-size: 0.8rem;
             padding: 0.25rem;
+        }
+
+        .scroll-sync {
+            height: 40vh;
         }
     }
 
