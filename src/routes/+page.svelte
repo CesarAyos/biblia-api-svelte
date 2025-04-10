@@ -11,7 +11,6 @@
 	let currentChapter: Chapter | null = null;
 	let isLoading = false;
 	let showSelectorDropdown = false;
-	let searchTerm = '';
 	let activeTab: 'version' | 'book' | 'chapter' | 'verse' = 'version';
 
 	// Listas de selección
@@ -34,6 +33,7 @@
 		'LEV',
 		'NUM',
 		'DEU',
+		'JOS',
 		'JDG',
 		'RUT',
 		'1SA',
@@ -53,10 +53,10 @@
 		'ISA',
 		'JER',
 		'LAM',
-		'EZE',
+		'EZK',
 		'DAN',
 		'HOS',
-		'JOE',
+		'JOL',
 		'AMO',
 		'OBA',
 		'JON',
@@ -69,29 +69,47 @@
 		'MAL',
 		'MAT',
 		'MRK',
-		'LK',
+		'LUK',
 		'JHN',
-		'HCH',
+		'ACT',
 		'ROM',
 		'1CO',
 		'2CO',
 		'GAL',
-		'EF',
-		'FIL',
+		'EPH',
+		'PHP',
 		'COL',
-		'1TE',
-		'2TE',
+		'1TH',
+		'2TH',
+		'1TI',
+		'2TI',
+		'TIT',
+		'PHM',
+		'HEB',
+		'JAS',
 		'1PE',
 		'2PE',
 		'1JN',
 		'2JN',
 		'3JN',
 		'JUD',
-		'APC'
+		'REV'
 	];
 	const chapters = Array(50)
 		.fill(0)
 		.map((_, i) => (i + 1).toString());
+
+	// Función para obtener los versículos actuales
+	function getCurrentVerses() {
+		if (!currentChapter) return [];
+		return (
+			currentChapter.items
+				?.filter((item) => item.type === 'verse')
+				.map((item) => item.verse_numbers[0].toString()) || []
+		);
+	}
+
+	$: currentVerses = getCurrentVerses();
 
 	// Cargar datos de la Biblia
 	async function loadBible(version: string, book: string) {
@@ -99,7 +117,6 @@
 			isLoading = true;
 			const response = await fetch(`/${version}/${book}.json`);
 			if (!response.ok) throw new Error(`Error ${response.status}: Archivo no encontrado`);
-
 			bibleData = await response.json();
 			selectedVerse = null;
 		} catch (error) {
@@ -129,12 +146,13 @@
 	}
 
 	function handleVerseChange(verse: number | null) {
-		selectedVerse = verse;
-		if (verse) {
-			scrollToVerse();
-		}
-		showSelectorDropdown = false;
-	}
+    selectedVerse = verse;
+    if (verse !== null) {
+        scrollToVerse();
+    }
+    showSelectorDropdown = false;
+}
+
 
 	// Desplazamiento a versículo
 	function scrollToVerse() {
@@ -150,51 +168,10 @@
 		}
 	}
 
-	// Filtrar opciones basadas en búsqueda
-	function filterOptions(options: string[], search: string): string[] {
-		if (!search) return options;
-		return options.filter((option) => option.toLowerCase().includes(search.toLowerCase()));
-	}
-
-	// Filtrar versículos por número o contenido
-	function filterVerses(verses: string[], search: string, chapterData: Chapter | null): string[] {
-		if (!search || !chapterData) return verses;
-
-		return chapterData.items
-			.filter(
-				(item) =>
-					item.type === 'verse' &&
-					(item.verse_numbers.some((v) => v.toString().includes(search)) ||
-						item.lines.some((line) => line.toLowerCase().includes(search.toLowerCase())))
-			)
-			.map((item) => item.verse_numbers[0].toString());
-	}
-
-	// Obtener versículos actuales
-	function getCurrentVerses() {
-		if (!currentChapter) return [];
-		return (
-			currentChapter.items
-				?.filter((item) => item.type === 'verse')
-				?.map((item) => item.verse_numbers[0].toString()) || []
-		);
-	}
-
-	// Efectos reactivos
 	$: if (bibleData && selectedChapter) {
-		currentChapter =
-			bibleData?.chapters?.find((ch) => ch.chapter_usfm?.endsWith(selectedChapter)) || null;
-	}
+    currentChapter = bibleData?.chapters?.find(ch => ch.chapter_usfm?.endsWith(selectedChapter)) || null;
+}
 
-	$: filteredVersions = filterOptions(versions, activeTab === 'version' ? searchTerm : '');
-	$: filteredBooks = filterOptions(books, activeTab === 'book' ? searchTerm : '');
-	$: filteredChapters = filterOptions(chapters, activeTab === 'chapter' ? searchTerm : '');
-	$: currentVerses = getCurrentVerses();
-	$: filteredVerses = filterVerses(
-		currentVerses,
-		activeTab === 'verse' ? searchTerm : '',
-		currentChapter
-	);
 
 	// Carga inicial
 	onMount(() => {
@@ -217,11 +194,7 @@
 					<div class="card-header bg-dark text-white py-3">
 						<h2 class="h4 mb-0 text-center">
 							{#if bibleData && selectedChapter}
-								<span class="d-block d-md-inline">{bibleData.name}</span>
-								<span class="d-none d-md-inline mx-2">-</span>
-								<span class="d-block d-md-inline">{selectedVersion}</span>
-								<span class="d-none d-md-inline mx-2">-</span>
-								<span class="d-block d-md-inline">Capítulo {selectedChapter}</span>
+								<span>{bibleData.name} - {selectedVersion} - Capítulo {selectedChapter}</span>
 							{:else}
 								Selecciona un libro y capítulo
 							{/if}
@@ -229,19 +202,11 @@
 					</div>
 
 					<div class="card-body bg-light">
-						<!-- Selector compacto con tabs -->
+						<!-- Botón para abrir selector -->
 						<div class="d-flex justify-content-center mb-4">
 							<button
 								class="btn btn-primary dropdown-toggle"
-								on:click={() => {
-									showSelectorDropdown = !showSelectorDropdown;
-									searchTerm = '';
-									if (showSelectorDropdown) {
-										if (!selectedBook) activeTab = 'book';
-										else if (!selectedChapter) activeTab = 'chapter';
-										else activeTab = 'verse';
-									}
-								}}
+								on:click={() => (showSelectorDropdown = !showSelectorDropdown)}
 							>
 								<i class="bi bi-gear-fill me-2"></i>Seleccionar
 							</button>
@@ -249,31 +214,12 @@
 
 						{#if showSelectorDropdown}
 							<div class="selector-dropdown shadow-lg">
-								<div class="search-box p-2 bg-light border-bottom">
-									<input
-										type="text"
-										class="form-control"
-										placeholder="Buscar en {activeTab === 'version'
-											? 'versiones'
-											: activeTab === 'book'
-												? 'libros'
-												: activeTab === 'chapter'
-													? 'capítulos'
-													: 'versículos'}..."
-										bind:value={searchTerm}
-										autofocus
-									/>
-								</div>
-
 								<!-- Tabs de navegación -->
 								<ul class="nav nav-tabs">
 									<li class="nav-item">
 										<button
 											class="nav-link {activeTab === 'version' ? 'active' : ''}"
-											on:click={() => {
-												activeTab = 'version';
-												searchTerm = '';
-											}}
+											on:click={() => (activeTab = 'version')}
 										>
 											Versión
 										</button>
@@ -281,10 +227,7 @@
 									<li class="nav-item">
 										<button
 											class="nav-link {activeTab === 'book' ? 'active' : ''}"
-											on:click={() => {
-												activeTab = 'book';
-												searchTerm = '';
-											}}
+											on:click={() => (activeTab = 'book')}
 										>
 											Libro
 										</button>
@@ -292,10 +235,7 @@
 									<li class="nav-item">
 										<button
 											class="nav-link {activeTab === 'chapter' ? 'active' : ''}"
-											on:click={() => {
-												activeTab = 'chapter';
-												searchTerm = '';
-											}}
+											on:click={() => (activeTab = 'chapter')}
 											disabled={!selectedBook}
 										>
 											Capítulo
@@ -304,10 +244,7 @@
 									<li class="nav-item">
 										<button
 											class="nav-link {activeTab === 'verse' ? 'active' : ''}"
-											on:click={() => {
-												activeTab = 'verse';
-												searchTerm = '';
-											}}
+											on:click={() => (activeTab = 'verse')}
 											disabled={!selectedChapter || !currentChapter}
 										>
 											Versículo
@@ -315,91 +252,46 @@
 									</li>
 								</ul>
 
+								<!-- Opciones de selección -->
 								<div class="dropdown-options">
 									{#if activeTab === 'version'}
-										{#if filteredVersions.length === 0 && searchTerm}
-											<div class="text-center p-3 text-muted">
-												No se encontraron versiones que coincidan con "{searchTerm}"
-											</div>
-										{:else}
-											{#each filteredVersions as version}
-												<div
-													class="dropdown-option {selectedVersion === version ? 'active' : ''}"
-													on:click={() => {
-														handleVersionChange(version);
-														activeTab = 'book';
-														searchTerm = '';
-													}}
-												>
-													{version}
-												</div>
-											{/each}
-										{/if}
-									{:else if activeTab === 'book'}
-										{#if filteredBooks.length === 0 && searchTerm}
-											<div class="text-center p-3 text-muted">
-												No se encontraron libros que coincidan con "{searchTerm}"
-											</div>
-										{:else}
-											{#each filteredBooks as book}
-												<div
-													class="dropdown-option {selectedBook === book ? 'active' : ''}"
-													on:click={() => {
-														handleBookChange(book);
-														activeTab = 'chapter';
-														searchTerm = '';
-													}}
-												>
-													{book}
-												</div>
-											{/each}
-										{/if}
-									{:else if activeTab === 'chapter'}
-										{#if filteredChapters.length === 0 && searchTerm}
-											<div class="text-center p-3 text-muted">
-												No se encontraron capítulos que coincidan con "{searchTerm}"
-											</div>
-										{:else}
-											{#each filteredChapters as chapter}
-												<div
-													class="dropdown-option {selectedChapter === chapter ? 'active' : ''}"
-													on:click={() => {
-														handleChapterChange(chapter);
-														activeTab = 'verse';
-														searchTerm = '';
-													}}
-												>
-													Capítulo {chapter}
-												</div>
-											{/each}
-										{/if}
-									{:else if activeTab === 'verse'}
-										{#if filteredVerses.length === 0 && searchTerm}
-											<div class="text-center p-3 text-muted">
-												No se encontraron versículos que coincidan con "{searchTerm}"
-											</div>
-										{:else if currentVerses.length === 0}
-											<div class="text-center p-3 text-muted">
-												No hay versículos disponibles en este capítulo
-											</div>
-										{:else}
-											<div
-												class="dropdown-option {selectedVerse === null ? 'active' : ''}"
-												on:click={() => handleVerseChange(null)}
+										{#each versions as version}
+											<button
+												class="dropdown-option {selectedVersion === version ? 'active' : ''}"
+												on:click={() => handleVersionChange(version)}
 											>
-												Todos los versículos
-											</div>
-											{#each searchTerm ? filteredVerses : currentVerses as verse}
-												<div
-													class="dropdown-option {selectedVerse?.toString() === verse
-														? 'active'
-														: ''}"
-													on:click={() => handleVerseChange(parseInt(verse))}
-												>
-													Versículo {verse}
-												</div>
-											{/each}
-										{/if}
+												{version}
+											</button>
+										{/each}
+									{:else if activeTab === 'book'}
+										{#each books as book}
+											<button
+												class="dropdown-option {selectedBook === book ? 'active' : ''}"
+												on:click={() => handleBookChange(book)}
+											>
+												{book}
+											</button>
+										{/each}
+									{:else if activeTab === 'chapter'}
+										{#each chapters as chapter}
+											<button
+												class="dropdown-option {selectedChapter === chapter ? 'active' : ''}"
+												on:click={() => handleChapterChange(chapter)}
+											>
+												Capítulo {chapter}
+											</button>
+										{/each}
+									{:else if activeTab === 'verse'}
+										{#each currentVerses as verse}
+											<button
+												class="dropdown-option {selectedVerse?.toString() === verse
+													? 'active'
+													: ''}"
+												on:click={() => handleVerseChange(parseInt(verse))}
+											>
+												Versículo {verse}
+											</button>
+										{/each}
 									{/if}
 								</div>
 							</div>
@@ -414,9 +306,9 @@
 												class="verse mb-3 p-3 bg-light rounded"
 												id={'verse-' + item.verse_numbers[0]}
 											>
-												<sup class="verse-number badge bg-primary me-2"
-													>{item.verse_numbers.join(', ')}</sup
-												>
+												<sup class="verse-number badge bg-primary me-2">
+													{item.verse_numbers.join(', ')}
+												</sup>
 												<span class="verse-text">{item.lines.join(' ')}</span>
 											</div>
 										{/if}
@@ -476,12 +368,6 @@
 		flex-direction: column;
 	}
 
-	.search-box {
-		position: sticky;
-		top: 0;
-		z-index: 10;
-	}
-
 	.dropdown-options {
 		overflow-y: auto;
 		flex-grow: 1;
@@ -525,17 +411,6 @@
 		color: #0d6efd;
 		border-bottom: 2px solid #0d6efd;
 		font-weight: bold;
-	}
-
-	.nav-link.disabled {
-		cursor: not-allowed;
-		opacity: 0.6;
-	}
-
-	.highlight-verse {
-		animation: highlight 2s ease;
-		background-color: #e0f0ff;
-		box-shadow: 0 0 0 2px #a0c4ff;
 	}
 
 	@keyframes highlight {
