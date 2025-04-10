@@ -35,80 +35,65 @@
 		'TLA',
 		'TLAI'
 	];
+	
 	const books = [
-		'GEN', // Génesis
-		'EXO', // Éxodo
-		'LEV', // Levítico
-		'NUM', // Números
-		'DEU', // Deuteronomio
-		'JOS', // Josué
-		'JDG', // Jueces
-		'RUT', // Rut
-		'1SA', // 1 Samuel
-		'2SA', // 2 Samuel
-		'1KI', // 1 Reyes
-		'2KI', // 2 Reyes
-		'1CH', // 1 Crónicas
-		'2CH', // 2 Crónicas
-		'EZR', // Esdras
-		'NEH', // Nehemías
-		'EST', // Ester
-		'JOB', // Job
-		'PSA', // Salmos
-		'PRO', // Proverbios
-		'ECC', // Eclesiastés
-		'SNG', // Cantares
-		'ISA', // Isaías
-		'JER', // Jeremías
-		'LAM', // Lamentaciones
-		'EZK', // Ezequiel
-		'DAN', // Daniel
-		'HOS', // Oseas
-		'JOL', // Joel
-		'AMO', // Amós
-		'OBA', // Abdías
-		'JON', // Jonás
-		'MIC', // Miqueas
-		'NAM', // Nahúm
-		'HAB', // Habacuc
-		'ZEP', // Sofonías
-		'HAG', // Hageo
-		'ZEC', // Zacarías
-		'MAL', // Malaquías
-		'MAT', // Mateo
-		'MRK', // Marcos
-		'LUK', // Lucas
-		'JHN', // Juan
-		'ACT', // Hechos
-		'ROM', // Romanos
-		'1CO', // 1 Corintios
-		'2CO', // 2 Corintios
-		'GAL', // Gálatas
-		'EPH', // Efesios
-		'PHP', // Filipenses
-		'COL', // Colosenses
-		'1TH', // 1 Tesalonicenses
-		'2TH', // 2 Tesalonicenses
-		'1TI', // 1 Timoteo
-		'2TI', // 2 Timoteo
-		'TIT', // Tito
-		'PHM', // Filemón
-		'HEB', // Hebreos
-		'JAS', // Santiago
-		'1PE', // 1 Pedro
-		'2PE', // 2 Pedro
-		'1JN', // 1 Juan
-		'2JN', // 2 Juan
-		'3JN', // 3 Juan
-		'JUD', // Judas
-		'REV' // Apocalipsis
+		'GEN', 'EXO', 'LEV', 'NUM', 'DEU', 'JOS', 'JDG', 'RUT', '1SA', '2SA',
+		'1KI', '2KI', '1CH', '2CH', 'EZR', 'NEH', 'EST', 'JOB', 'PSA', 'PRO',
+		'ECC', 'SNG', 'ISA', 'JER', 'LAM', 'EZK', 'DAN', 'HOS', 'JOL', 'AMO',
+		'OBA', 'JON', 'MIC', 'NAM', 'HAB', 'ZEP', 'HAG', 'ZEC', 'MAL', 'MAT',
+		'MRK', 'LUK', 'JHN', 'ACT', 'ROM', '1CO', '2CO', 'GAL', 'EPH', 'PHP',
+		'COL', '1TH', '2TH', '1TI', '2TI', 'TIT', 'PHM', 'HEB', 'JAS', '1PE',
+		'2PE', '1JN', '2JN', '3JN', 'JUD', 'REV'
 	];
 
 	let totalBooks = books.length;
 
-	const chapters = Array(50)
-		.fill(0)
-		.map((_, i) => (i + 1).toString());
+	// Mapa de capítulos por libro
+	const bookChapters: Record<string, number> = {
+		'GEN': 50, 'EXO': 40, 'LEV': 27, 'NUM': 36, 'DEU': 34,
+		'JOS': 24, 'JDG': 21, 'RUT': 4, '1SA': 31, '2SA': 24,
+		'1KI': 22, '2KI': 25, '1CH': 29, '2CH': 36, 'EZR': 10,
+		'NEH': 13, 'EST': 10, 'JOB': 42, 'PSA': 150, 'PRO': 31,
+		'ECC': 12, 'SNG': 8, 'ISA': 66, 'JER': 52, 'LAM': 5,
+		'EZK': 48, 'DAN': 12, 'HOS': 14, 'JOL': 3, 'AMO': 9,
+		'OBA': 1, 'JON': 4, 'MIC': 7, 'NAM': 3, 'HAB': 3,
+		'ZEP': 3, 'HAG': 2, 'ZEC': 14, 'MAL': 4, 'MAT': 28,
+		'MRK': 16, 'LUK': 24, 'JHN': 21, 'ACT': 28, 'ROM': 16,
+		'1CO': 16, '2CO': 13, 'GAL': 6, 'EPH': 6, 'PHP': 4,
+		'COL': 4, '1TH': 5, '2TH': 3, '1TI': 6, '2TI': 4,
+		'TIT': 3, 'PHM': 1, 'HEB': 13, 'JAS': 5, '1PE': 5,
+		'2PE': 3, '1JN': 5, '2JN': 1, '3JN': 1, 'JUD': 1,
+		'REV': 22
+	};
+
+	// Mapa de nombres completos de los libros
+	const bookFullNames: Record<string, string> = {
+		'GEN': 'Génesis', 'EXO': 'Éxodo', 'LEV': 'Levítico', 'NUM': 'Números', 'DEU': 'Deuteronomio',
+		'JOS': 'Josué', 'JDG': 'Jueces', 'RUT': 'Rut', '1SA': '1 Samuel', '2SA': '2 Samuel',
+		'1KI': '1 Reyes', '2KI': '2 Reyes', '1CH': '1 Crónicas', '2CH': '2 Crónicas', 'EZR': 'Esdras',
+		'NEH': 'Nehemías', 'EST': 'Ester', 'JOB': 'Job', 'PSA': 'Salmos', 'PRO': 'Proverbios',
+		'ECC': 'Eclesiastés', 'SNG': 'Cantares', 'ISA': 'Isaías', 'JER': 'Jeremías', 'LAM': 'Lamentaciones',
+		'EZK': 'Ezequiel', 'DAN': 'Daniel', 'HOS': 'Oseas', 'JOL': 'Joel', 'AMO': 'Amós',
+		'OBA': 'Abdías', 'JON': 'Jonás', 'MIC': 'Miqueas', 'NAM': 'Nahúm', 'HAB': 'Habacuc',
+		'ZEP': 'Sofonías', 'HAG': 'Hageo', 'ZEC': 'Zacarías', 'MAL': 'Malaquías', 'MAT': 'Mateo',
+		'MRK': 'Marcos', 'LUK': 'Lucas', 'JHN': 'Juan', 'ACT': 'Hechos', 'ROM': 'Romanos',
+		'1CO': '1 Corintios', '2CO': '2 Corintios', 'GAL': 'Gálatas', 'EPH': 'Efesios', 'PHP': 'Filipenses',
+		'COL': 'Colosenses', '1TH': '1 Tesalonicenses', '2TH': '2 Tesalonicenses', '1TI': '1 Timoteo',
+		'2TI': '2 Timoteo', 'TIT': 'Tito', 'PHM': 'Filemón', 'HEB': 'Hebreos', 'JAS': 'Santiago',
+		'1PE': '1 Pedro', '2PE': '2 Pedro', '1JN': '1 Juan', '2JN': '2 Juan', '3JN': '3 Juan',
+		'JUD': 'Judas', 'REV': 'Apocalipsis'
+	};
+
+	// Función para obtener los capítulos del libro actual
+	function getChaptersForCurrentBook(): string[] {
+		const chapterCount = bookChapters[selectedBook] || 1;
+		return Array.from({ length: chapterCount }, (_, i) => (i + 1).toString());
+	}
+
+	// Función para obtener el nombre completo del libro
+	function getBookFullName(bookCode: string): string {
+		return bookFullNames[bookCode] || bookCode;
+	}
 
 	// Verificar conexión a internet
 	function checkOnlineStatus() {
@@ -145,7 +130,7 @@
 				}
 			}
 
-			isBibleDownloaded = true; // Marcar como descargado
+			isBibleDownloaded = true;
 			alert('¡Descarga completada! La Biblia está ahora disponible offline.');
 		} catch (error) {
 			console.error('Error en la descarga:', error);
@@ -245,7 +230,7 @@
 
 	$: filteredVersions = filterOptions(versions, searchTerm);
 	$: filteredBooks = filterOptions(books, searchTerm);
-	$: filteredChapters = filterOptions(chapters, searchTerm);
+	$: filteredChapters = filterOptions(getChaptersForCurrentBook(), searchTerm);
 	$: verses =
 		currentChapter?.items
 			?.filter((item) => item.type === 'verse')
@@ -283,11 +268,15 @@
                     <div class="card-header bg-dark text-white py-3">
                         <h2 class="h4 mb-0 text-center">
                             {#if bibleData && selectedChapter}
-                                <span class="d-block d-md-inline">{bibleData.name}</span>
+                                <span class="d-block d-md-inline">{getBookFullName(selectedBook)}</span>
                                 <span class="d-none d-md-inline mx-2">-</span>
                                 <span class="d-block d-md-inline">{selectedVersion}</span>
                                 <span class="d-none d-md-inline mx-2">-</span>
                                 <span class="d-block d-md-inline">Capítulo {selectedChapter}</span>
+                                {#if selectedVerse}
+                                    <span class="d-none d-md-inline mx-2">-</span>
+                                    <span class="d-block d-md-inline">Versículo {selectedVerse}</span>
+                                {/if}
                             {:else}
                                 Selecciona un libro y capítulo
                             {/if}
@@ -295,7 +284,7 @@
                     </div>
 
                     <div class="card-body bg-light">
-                        <!-- Sección de descarga offline - SOLO se muestra si NO está descargada -->
+                        <!-- Sección de descarga offline -->
                         {#if !isBibleDownloaded && isOnline}
                             <div class="offline-section mb-4 p-3 bg-white rounded shadow-sm">
                                 <h5 class="mb-3">
@@ -333,7 +322,7 @@
                             </div>
                         {/if}
 
-                        <!-- Selector compacto con tabs -->
+                        <!-- Selector de versión/libro/capítulo/versículo -->
                         <div class="d-flex justify-content-center mb-4">
                             <button
                                 class="btn btn-primary dropdown-toggle"
@@ -358,7 +347,6 @@
                                     />
                                 </div>
 
-                                <!-- Tabs de navegación -->
                                 <ul class="nav nav-tabs">
                                     <li class="nav-item">
                                         <button
@@ -418,20 +406,22 @@
                                                     activeTab = 'chapter';
                                                 }}
                                             >
-                                                {book}
+                                                {getBookFullName(book)}
                                             </div>
                                         {/each}
                                     {:else if activeTab === 'chapter'}
-                                        {#each filteredChapters as chapter}
-                                            <div
-                                                class="dropdown-option {selectedChapter === chapter ? 'active' : ''}"
-                                                on:click={() => {
-                                                    handleChapterChange(chapter);
-                                                    activeTab = 'verse';
-                                                }}
-                                            >
-                                                Capítulo {chapter}
-                                            </div>
+                                        {#each getChaptersForCurrentBook() as chapter}
+                                            {#if searchTerm === '' || chapter.includes(searchTerm)}
+                                                <div
+                                                    class="dropdown-option {selectedChapter === chapter ? 'active' : ''}"
+                                                    on:click={() => {
+                                                        handleChapterChange(chapter);
+                                                        activeTab = 'verse';
+                                                    }}
+                                                >
+                                                    Capítulo {chapter}
+                                                </div>
+                                            {/if}
                                         {/each}
                                     {:else if activeTab === 'verse'}
                                         <div
@@ -455,6 +445,7 @@
                             </div>
                         {/if}
 
+                        <!-- Contenido bíblico -->
                         {#if bibleData && currentChapter}
                             <div class="bg-white p-4 rounded shadow-sm bible-content">
                                 <div class="bible-text fs-5">
