@@ -3,7 +3,14 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+  "ts-node": {
+    "compilerOptions": {
+      "module": "ESNext",
+      "esModuleInterop": true
+    }
+  },
 	"scripts": {
+		"generate-bible": "ts-node src/lib/generateBibleJson.ts",
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
@@ -17,11 +24,13 @@
 		"@sveltejs/adapter-auto": "^4.0.0",
 		"@sveltejs/kit": "^2.16.0",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
+		"@types/node": "^22.14.0",
 		"prettier": "^3.4.2",
 		"prettier-plugin-svelte": "^3.3.3",
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.0.0",
-		"typescript": "^5.0.0",
+		"ts-node": "^10.9.2",
+		"typescript": "^5.8.3",
 		"vite": "^6.0.0"
 	},
 	"dependencies": {

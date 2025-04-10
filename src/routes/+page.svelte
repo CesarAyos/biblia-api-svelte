@@ -1,478 +1,491 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		fetchVersions,
-		fetchBooks,
-		fetchChapter,
-		preloadVersion,
-		getFromLocalStorage
-	} from '../api/fetchData';
-	import type { Version, Book, ChapterData } from '../api/fetchData';
-	import { writable } from 'svelte/store';
+	import type { Book, Chapter } from '../typs';
 
-	// Variables principales
-	let versions: Version[] = [];
-	let selectedVersion: string | null = null;
-	let books: Book[] = [];
-	let selectedBook: string | null = null;
-	let bookDetails: Book | null = null;
-	let loadingVersions = false;
-
-	// Variables del componente Chapter
-	let selectedChapter: number | null = null;
-	let chapterData: ChapterData | null = null;
+	// Estado de la aplicación
+	let selectedVersion = 'RVR1960';
+	let selectedBook = 'GEN';
+	let selectedChapter = '1';
+	let selectedVerse: number | null = null;
+	let bibleData: Book | null = null;
+	let currentChapter: Chapter | null = null;
 	let isLoading = false;
-	let error: string | null = null;
-	let feedbackMessage: string | null = null;
-	let selectedVerses: { number: number; text: string; color?: string }[] = [];
-	let showModal = false;
-	let buttonsVisible = false;
-	let selectionTimeout: number | null = null;
-	let selectedColor: string | null = null;
-	let showColorPicker = false;
-	let loadingDownload = false;
-	let downloadProgress = 0;
-	let statusMessage = '';
+	let showSelectorDropdown = false;
+	let searchTerm = '';
+	let activeTab: 'version' | 'book' | 'chapter' | 'verse' = 'version';
 
-	const colors = ['rgba(255, 0, 0, 0.2)', 'rgba(0, 255, 0, 0.2)', 'rgba(0, 0, 255, 0.2)', 'rgba(255, 255, 0, 0.2)', 'rgba(255, 0, 255, 0.2)'];
+	// Listas de selección
+	const versions = [
+		'DHH94I',
+		'DHHS94',
+		'LBLA',
+		'NBLA',
+		'NTV',
+		'NVI',
+		'RVA2015',
+		'RVC',
+		'RVR1960',
+		'TLA',
+		'TLAI'
+	];
+	const books = ['GEN', 'EXO', 'LEV', 'NUM', 'DEU'];
+	const chapters = Array(50).fill(0).map((_, i) => (i + 1).toString());
 
-	// Verificar disponibilidad de localStorage
-	function isLocalStorageAvailable() {
+	// Cargar datos de la Biblia
+	async function loadBible(version: string, book: string) {
 		try {
-			const testKey = '_test_';
-			localStorage.setItem(testKey, 'test');
-			localStorage.removeItem(testKey);
-			return true;
-		} catch (e) {
-			return false;
-		}
-	}
+			isLoading = true;
+			const response = await fetch(`/${version}/${book}.json`);
+			if (!response.ok) throw new Error(`Error ${response.status}: Archivo no encontrado`);
 
-	// Inicializar darkMode
-	const darkMode = writable(false);
-
-	if (isLocalStorageAvailable()) {
-		// Leer el estado inicial desde localStorage
-		const storedValue = JSON.parse(localStorage.getItem('darkMode') || 'false');
-		darkMode.set(storedValue);
-
-		// Actualizar localStorage cuando el store cambie
-		darkMode.subscribe((value) => {
-			localStorage.setItem('darkMode', JSON.stringify(value));
-		});
-	}
-
-	// Alternar tema
-	function toggleTheme() {
-		darkMode.update((mode) => !mode);
-	}
-
-	// Carga de versiones al montar el componente
-	onMount(async () => {
-		try {
-			loadingVersions = true;
-			versions = await fetchVersions();
+			bibleData = await response.json();
+			selectedVerse = null;
+		} catch (error) {
+			console.error('Error cargando la Biblia:', error);
+			bibleData = null;
 		} finally {
-			loadingVersions = false;
-		}
-	});
-
-	// Cargar libros cuando se selecciona una versión
-	$: if (selectedVersion) {
-		loadBooks(selectedVersion);
-	}
-
-	async function loadBooks(version: string) {
-		try {
-			books = await fetchBooks(version);
-		} catch (err) {
-			console.error(`Error al cargar libros: ${(err as Error).message}`);
+			isLoading = false;
 		}
 	}
 
-	// Actualizar detalles del libro seleccionado
-	$: if (selectedBook) {
-		bookDetails = books.find((book) => book.abrev === selectedBook) || null;
+	// Manejar cambios de selección
+	function handleVersionChange(version: string) {
+		selectedVersion = version;
+		loadBible(selectedVersion, selectedBook);
 	}
 
-	// Funciones del componente Chapter
-	function loadMarkedVerses() {
-		const storedVerses = localStorage.getItem(`markedVerses-${selectedBook}-${selectedChapter}`);
-		if (storedVerses) {
-			selectedVerses = JSON.parse(storedVerses);
+	function handleBookChange(book: string) {
+		selectedBook = book;
+		selectedChapter = '1';
+		loadBible(selectedVersion, selectedBook);
+		activeTab = 'chapter';
+	}
+
+	function handleChapterChange(chapter: string) {
+		selectedChapter = chapter;
+		activeTab = 'verse';
+	}
+
+	function handleVerseChange(verse: number | null) {
+		selectedVerse = verse;
+		if (verse) {
+			scrollToVerse();
 		}
+		showSelectorDropdown = false;
 	}
 
-	function goToVerse(verseNumber: number) {
-		closeModal();
-		setTimeout(() => {
-			const verseElement = document.getElementById(`verse-${verseNumber}`);
+	// Desplazamiento a versículo
+	function scrollToVerse() {
+		if (selectedVerse) {
+			const verseElement = document.getElementById(`verse-${selectedVerse}`) as HTMLElement;
 			if (verseElement) {
 				verseElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				verseElement.classList.add('highlight-verse');
+				setTimeout(() => {
+					verseElement.classList.remove('highlight-verse');
+				}, 2000);
 			}
-		}, 100);
+		}
 	}
 
-	function saveMarkedVerses() {
-		localStorage.setItem(
-			`markedVerses-${selectedBook}-${selectedChapter}`,
-			JSON.stringify(selectedVerses)
+	// Filtrar opciones basadas en búsqueda
+	function filterOptions(options: string[], search: string): string[] {
+		if (!search) return options;
+		return options.filter(option => 
+			option.toLowerCase().includes(search.toLowerCase())
 		);
 	}
 
-	async function loadChapter() {
-		if (!selectedBook || !selectedChapter || !selectedVersion) {
-			error = 'Por favor selecciona un libro, versión y capítulo válidos.';
-			return;
-		}
-
-		isLoading = true;
-		chapterData = null;
-		error = null;
-		selectedVerses = [];
-		feedbackMessage = null;
-
-		// Asegúrate de que selectedBook y selectedVersion no sean null
-		if (selectedVersion && selectedBook) {
-			const cachedData = getFromLocalStorage(
-				selectedVersion, // Ahora es seguro porque se verifica que no es null
-				selectedBook.toLowerCase(), // Ahora es seguro porque se verifica que no es null
-				selectedChapter
-			);
-
-			if (cachedData) {
-				chapterData = cachedData;
-				loadMarkedVerses();
-				showModal = true;
-				isLoading = false;
-				return;
-			}
-
-			try {
-				chapterData = await fetchChapter(
-					selectedVersion, // Ahora es seguro porque se verifica que no es null
-					selectedBook.toLowerCase(), // Ahora es seguro porque se verifica que no es null
-					selectedChapter
-				);
-				saveToLocalStorage(
-					selectedVersion,
-					selectedBook.toLowerCase(),
-					selectedChapter,
-					chapterData
-				);
-				loadMarkedVerses();
-				showModal = true;
-			} catch (err) {
-				const errorObj = err as Error;
-				error = errorObj.message || 'Error al cargar el capítulo.';
-			} finally {
-				isLoading = false;
-			}
-		}
-	}
-
-	function saveToLocalStorage(version: string, book: string, chapter: number, data: any) {
-		const key = `${version}-${book}-${chapter}`; // Crear una clave única
-		localStorage.setItem(key, JSON.stringify(data)); // Guardar los datos en localStorage
-	}
-
-	function toggleVerseSelection(verseNumber: number, verseText: string) {
-		if (!selectedColor) {
-			feedbackMessage = 'Selecciona un color antes de marcar un versículo.';
-			setTimeout(() => (feedbackMessage = null), 3000);
-			return;
-		}
-
-		const index = selectedVerses.findIndex((v) => v.number === verseNumber);
-
-		if (index >= 0) {
-			selectedVerses.splice(index, 1);
-		} else {
-			selectedVerses.push({ number: verseNumber, text: verseText, color: selectedColor });
-		}
-
-		selectedVerses = [...selectedVerses];
-		buttonsVisible = selectedVerses.length > 0;
-		saveMarkedVerses();
-
-		if (selectionTimeout) clearTimeout(selectionTimeout);
-		selectionTimeout = window.setTimeout(() => {
-			buttonsVisible = true;
-		}, 1000);
-	}
-
-	function copySelectedVerses() {
-		if (selectedVerses.length > 0) {
-			const textToCopy = selectedVerses
-				.map(
-					(v) =>
-						`${selectedBook || 'Libro desconocido'} (${
-							selectedVersion || 'Versión desconocida'
-						}), Capítulo ${selectedChapter || 'N/A'}, Versículo ${v.number}: ${v.text}`
+	// Filtrar versículos por número o contenido
+	function filterVerses(verses: string[], search: string, chapterData: Chapter | null): string[] {
+		if (!search || !chapterData) return verses;
+		
+		return chapterData.items
+			.filter(item => 
+				item.type === 'verse' &&
+				(
+					item.verse_numbers.some(v => v.toString().includes(search)) ||
+					item.lines.some(line => line.toLowerCase().includes(search.toLowerCase()))
 				)
-				.join('\n');
-			navigator.clipboard.writeText(textToCopy).then(() => {
-				feedbackMessage = 'Texto copiado al portapapeles.';
-				setTimeout(() => (feedbackMessage = null), 3000);
-			});
-		}
+			)
+			.map(item => item.verse_numbers[0].toString());
 	}
 
-	function shareSelectedVersesViaWhatsApp() {
-		if (selectedVerses.length > 0) {
-			const textToShare = selectedVerses
-				.map(
-					(v) =>
-						`${selectedBook || 'Libro desconocido'} (${
-							selectedVersion || 'Versión desconocida'
-						}), Capítulo ${selectedChapter || 'N/A'}, Versículo ${v.number}: ${v.text}`
-				)
-				.join('\n');
-			const shareURL = `https://wa.me/?text=${encodeURIComponent(textToShare)}`;
-			window.open(shareURL, '_blank');
-		}
+	// Obtener versículos actuales
+	function getCurrentVerses() {
+		if (!currentChapter) return [];
+		return currentChapter.items
+			?.filter(item => item.type === 'verse')
+			?.map(item => item.verse_numbers[0].toString()) || [];
 	}
 
-	function closeModal() {
-		showModal = false;
+	// Efectos reactivos
+	$: if (bibleData && selectedChapter) {
+		currentChapter =
+			bibleData?.chapters?.find((ch) => ch.chapter_usfm?.endsWith(selectedChapter)) || null;
 	}
 
-	function selectColor(color: string) {
-		selectedColor = color;
-		showColorPicker = false;
-	}
+	$: filteredVersions = filterOptions(versions, activeTab === 'version' ? searchTerm : '');
+	$: filteredBooks = filterOptions(books, activeTab === 'book' ? searchTerm : '');
+	$: filteredChapters = filterOptions(chapters, activeTab === 'chapter' ? searchTerm : '');
+	$: currentVerses = getCurrentVerses();
+	$: filteredVerses = filterVerses(currentVerses, activeTab === 'verse' ? searchTerm : '', currentChapter);
+
+	// Carga inicial
+	onMount(() => {
+		loadBible(selectedVersion, selectedBook);
+	});
 </script>
 
-<main
-	class="{$darkMode ? 'bg-dark text-warning border-warning' : 'bg-light text-dark border-dark'} p-2"
-	style="border: 8px groove #ff6550; text-shadow: 3px 12px 7px rgba(0,0,0,0.6); min-height: 100vh; overflow: auto;"
->
-	<!-- Barra de navegación -->
-	<div class:dark-mode={$darkMode}>
-		<div class="d-flex justify-content-center p-2 {$darkMode ? 'bg-dark' : 'bg-light'} ">
-			<p class="navbar-brand {$darkMode ? 'text-warning' : 'text-dark'} fs-3 fw-bold">
-				<i class="bi bi-book"></i> Biblia <strong>{selectedVersion || ''}</strong>
-			</p>
-		</div>
-
-		<div class="navbar-nav me-auto mb-2 mb-lg-0">
-			<li class="nav-item">
-				<div class="d-flex flex-column flex-lg-row align-items-center">
-					<!-- Selector de versión -->
-					<select
-						class="form-select form-select-sm {$darkMode
-							? 'bg-dark text-warning border-warning'
-							: 'bg-light text-dark border-dark'} me-2 mb-2 mb-lg-0"
-						bind:value={selectedVersion}
-					>
-						<option value="" disabled selected>Elige una versión</option>
-						{#each versions as version}
-							<option value={version.version}>{version.name}</option>
-						{/each}
-					</select>
-
-					<!-- Selector de libros -->
-					{#if selectedVersion && books.length > 0}
-						<p class="{$darkMode ? 'text-warning' : 'text-dark'} me-2 mb-2 mb-lg-0">Libro:</p>
-						<select
-							class="form-select form-select-sm {$darkMode
-								? 'bg-dark text-warning border-warning'
-								: 'bg-light text-dark border-dark'}"
-							bind:value={selectedBook}
-						>
-							<option value="" disabled selected>Elige un libro</option>
-							{#each books as book}
-								<option value={book.abrev}>{book.names[0]}</option>
-							{/each}
-						</select>
-					{:else if selectedVersion}
-						<span
-							class="spinner-border {$darkMode ? 'text-warning' : 'text-dark'} spinner-border-sm"
-							role="status"
-						></span>
-					{:else}
-						<p class={$darkMode ? 'text-warning' : 'text-dark'}>Selecciona una versión primero</p>
-					{/if}
-				</div>
-				{#if selectedBook && bookDetails}
-					<p class="text-center {$darkMode ? 'text-warning' : 'text-dark'} me-2 mb-2 mb-lg-0">
-						Capitulo:
-					</p>
-					<div class="chapter-dropdown">
-						<select
-							class="form-select form-select-sm {$darkMode
-								? 'bg-dark text-warning border-warning'
-								: 'bg-light text-dark border-dark'}"
-							bind:value={selectedChapter}
-							on:change={loadChapter}
-							disabled={isLoading}
-						>
-							<option value="" disabled selected>Selecciona un capítulo</option>
-							{#each Array(bookDetails.chapters)
-								.fill(0)
-								.map((_, i) => i + 1) as chapter}
-								<option value={chapter}>Capítulo {chapter}</option>
-							{/each}
-						</select>
+<main class="container-fluid py-4 bg-gradient-primary">
+	<div class="row justify-content-center">
+		<div class="col-12 col-lg-10">
+			{#if isLoading}
+				<div class="text-center py-5">
+					<div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+						<span class="visually-hidden">Cargando...</span>
 					</div>
-				{/if}
-			</li>
-		</div>
+					<p class="h4 text-light mt-3">Cargando nueva versión...</p>
+				</div>
+			{:else}
+				<div class="card shadow-lg mb-4">
+					<div class="card-header bg-dark text-white py-3">
+						<h2 class="h4 mb-0 text-center">
+							{#if bibleData && selectedChapter}
+								<span class="d-block d-md-inline">{bibleData.name}</span>
+								<span class="d-none d-md-inline mx-2">-</span>
+								<span class="d-block d-md-inline">{selectedVersion}</span>
+								<span class="d-none d-md-inline mx-2">-</span>
+								<span class="d-block d-md-inline">Capítulo {selectedChapter}</span>
+							{:else}
+								Selecciona un libro y capítulo
+							{/if}
+						</h2>
+					</div>
 
-		<div>
-			{#if chapterData && chapterData.vers?.length > 0}
-				<div class="verse-list p-4">
-					{#each chapterData.vers as verse}
-						<li id="verse-{verse.number}" class="verse-item">
-							<button
-								type="button"
-								class="verse-list {$darkMode
-									? 'bg-dark text-warning border-warning'
-									: 'bg-light text-dark border-dark'}"
-								style="text-shadow: 2px 12px 5px rgba(0,0,0,0.6); border: none; outline: none; background-color: {selectedVerses.find(
-									(v) => v.number === verse.number
-								)?.color || 'transparent'} !important;"
-								on:click={() => toggleVerseSelection(verse.number, verse.verse)}
+					<div class="card-body bg-light">
+						<!-- Selector compacto con tabs -->
+						<div class="d-flex justify-content-center mb-4">
+							<button 
+								class="btn btn-primary dropdown-toggle" 
+								on:click={() => {
+									showSelectorDropdown = !showSelectorDropdown;
+									searchTerm = '';
+									if (showSelectorDropdown) {
+										if (!selectedBook) activeTab = 'book';
+										else if (!selectedChapter) activeTab = 'chapter';
+										else activeTab = 'verse';
+									}
+								}}
 							>
-								<strong class="verse-number">{verse.number}:</strong>
-								{verse.verse}
+								<i class="bi bi-gear-fill me-2"></i>Seleccionar
 							</button>
-						</li>
-					{/each}
+						</div>
+
+						{#if showSelectorDropdown}
+							<div class="selector-dropdown shadow-lg">
+								<div class="search-box p-2 bg-light border-bottom">
+									<input 
+										type="text" 
+										class="form-control" 
+										placeholder="Buscar en {activeTab === 'version' ? 'versiones' : activeTab === 'book' ? 'libros' : activeTab === 'chapter' ? 'capítulos' : 'versículos'}..." 
+										bind:value={searchTerm}
+										autofocus
+									>
+								</div>
+								
+								<!-- Tabs de navegación -->
+								<ul class="nav nav-tabs">
+									<li class="nav-item">
+										<button 
+											class="nav-link {activeTab === 'version' ? 'active' : ''}"
+											on:click={() => {
+												activeTab = 'version';
+												searchTerm = '';
+											}}
+										>
+											Versión
+										</button>
+									</li>
+									<li class="nav-item">
+										<button 
+											class="nav-link {activeTab === 'book' ? 'active' : ''}"
+											on:click={() => {
+												activeTab = 'book';
+												searchTerm = '';
+											}}
+										>
+											Libro
+										</button>
+									</li>
+									<li class="nav-item">
+										<button 
+											class="nav-link {activeTab === 'chapter' ? 'active' : ''}"
+											on:click={() => {
+												activeTab = 'chapter';
+												searchTerm = '';
+											}}
+											disabled={!selectedBook}
+										>
+											Capítulo
+										</button>
+									</li>
+									<li class="nav-item">
+										<button 
+											class="nav-link {activeTab === 'verse' ? 'active' : ''}"
+											on:click={() => {
+												activeTab = 'verse';
+												searchTerm = '';
+											}}
+											disabled={!selectedChapter || !currentChapter}
+										>
+											Versículo
+										</button>
+									</li>
+								</ul>
+								
+								<div class="dropdown-options">
+									{#if activeTab === 'version'}
+										{#if filteredVersions.length === 0 && searchTerm}
+											<div class="text-center p-3 text-muted">
+												No se encontraron versiones que coincidan con "{searchTerm}"
+											</div>
+										{:else}
+											{#each filteredVersions as version}
+												<div 
+													class="dropdown-option {selectedVersion === version ? 'active' : ''}"
+													on:click={() => {
+														handleVersionChange(version);
+														activeTab = 'book';
+														searchTerm = '';
+													}}
+												>
+													{version}
+												</div>
+											{/each}
+										{/if}
+									{:else if activeTab === 'book'}
+										{#if filteredBooks.length === 0 && searchTerm}
+											<div class="text-center p-3 text-muted">
+												No se encontraron libros que coincidan con "{searchTerm}"
+											</div>
+										{:else}
+											{#each filteredBooks as book}
+												<div 
+													class="dropdown-option {selectedBook === book ? 'active' : ''}"
+													on:click={() => {
+														handleBookChange(book);
+														activeTab = 'chapter';
+														searchTerm = '';
+													}}
+												>
+													{book}
+												</div>
+											{/each}
+										{/if}
+									{:else if activeTab === 'chapter'}
+										{#if filteredChapters.length === 0 && searchTerm}
+											<div class="text-center p-3 text-muted">
+												No se encontraron capítulos que coincidan con "{searchTerm}"
+											</div>
+										{:else}
+											{#each filteredChapters as chapter}
+												<div 
+													class="dropdown-option {selectedChapter === chapter ? 'active' : ''}"
+													on:click={() => {
+														handleChapterChange(chapter);
+														activeTab = 'verse';
+														searchTerm = '';
+													}}
+												>
+													Capítulo {chapter}
+												</div>
+											{/each}
+										{/if}
+									{:else if activeTab === 'verse'}
+										{#if filteredVerses.length === 0 && searchTerm}
+											<div class="text-center p-3 text-muted">
+												No se encontraron versículos que coincidan con "{searchTerm}"
+											</div>
+										{:else if currentVerses.length === 0}
+											<div class="text-center p-3 text-muted">
+												No hay versículos disponibles en este capítulo
+											</div>
+										{:else}
+											<div 
+												class="dropdown-option {selectedVerse === null ? 'active' : ''}"
+												on:click={() => handleVerseChange(null)}
+											>
+												Todos los versículos
+											</div>
+											{#each (searchTerm ? filteredVerses : currentVerses) as verse}
+												<div 
+													class="dropdown-option {selectedVerse?.toString() === verse ? 'active' : ''}"
+													on:click={() => handleVerseChange(parseInt(verse))}
+												>
+													Versículo {verse}
+												</div>
+											{/each}
+										{/if}
+									{/if}
+								</div>
+							</div>
+						{/if}
+
+						{#if bibleData && currentChapter}
+							<div class="bg-white p-4 rounded shadow-sm bible-content">
+								<div class="bible-text fs-5">
+									{#each currentChapter?.items as item}
+										{#if item.type === 'verse'}
+											<div class="verse mb-3 p-3 bg-light rounded" id={'verse-' + item.verse_numbers[0]}>
+												<sup class="verse-number badge bg-primary me-2">{item.verse_numbers.join(', ')}</sup>
+												<span class="verse-text">{item.lines.join(' ')}</span>
+											</div>
+										{/if}
+									{/each}
+								</div>
+							</div>
+						{:else}
+							<div class="text-center py-5">
+								<i class="bi bi-book fs-1 text-muted"></i>
+								<p class="h4 text-muted mt-3">
+									{selectedBook ? 'Selecciona un capítulo' : 'Selecciona un libro'}
+								</p>
+							</div>
+						{/if}
+					</div>
 				</div>
 			{/if}
 		</div>
-
-		<!-- Botones flotantes -->
-		<div class="floating-buttons position-fixed bottom-0 start-0 pb-5">
-			<div class="d-flex flex-column gap-2">
-				<!-- Botón de colores -->
-				<button
-					class="btn rounded-circle bg-transparent"
-					style="font-size: 18px;"
-					on:click={() => (showColorPicker = !showColorPicker)}
-				>
-					🎨
-				</button>
-
-				<!-- Selector de colores -->
-				{#if showColorPicker}
-					<div class="d-flex flex-column gap-2 p-2 bg-transparent rounded shadow">
-						{#each colors as color}
-							<button
-								class="btn rounded-circle"
-								aria-label="arial"
-								style="width: 20px; height: 20px; background-color: {color};"
-								on:click={() => selectColor(color)}
-							></button>
-						{/each}
-					</div>
-				{/if}
-
-				<!-- Botón de copiar -->
-				<button
-					class="btn rounded-circle bg-transparent"
-					on:click={copySelectedVerses}
-					style="font-size: 18px;"
-					disabled={selectedVerses.length === 0}
-				>
-					📋
-				</button>
-
-				<!-- Botón de WhatsApp -->
-				<button
-					class="btn btn-whatsapp rounded-circle bg-transparent"
-					on:click={shareSelectedVersesViaWhatsApp}
-					style="font-size: 18px;"
-					disabled={selectedVerses.length === 0}
-				>
-					👨‍🚀
-				</button>
-				<!-- Botón de alternancia de tema -->
-				<button
-					on:click={toggleTheme}
-					class="btn rounded-circle {$darkMode ? 'btn-outline-warning' : 'btn-outline-dark'} ms-2"
-				>
-					{#if $darkMode}
-						🌞
-					{:else}
-						🌑
-					{/if}
-				</button>
-			</div>
-		</div>
 	</div>
-
-	<!-- Modal -->
-	{#if showModal}
-		<div class="modal">
-			<div class="modal-content">
-				{#if chapterData}
-					<ul class="modal-verse-list">
-						{#each chapterData.vers as verse}
-							<ul class="modal-verse-item">
-								<button
-									class="fs-3 form-select form-select-sm {$darkMode
-										? 'bg-dark text-warning border-warning'
-										: 'bg-light text-dark border-dark'}"
-									type="button"
-									on:click={() => goToVerse(verse.number)}
-								>
-									Versículo {verse.number}
-								</button>
-							</ul>
-						{/each}
-					</ul>
-				{/if}
-			</div>
-		</div>
-	{/if}
 </main>
 
-<!-- Estilos -->
 <style>
-	:root {
-		--bg-color: white;
-		--text-color: black;
+	.bg-gradient-primary {
+		background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+		min-height: 100vh;
 	}
-
-	.dark-mode {
-		--bg-color: black;
-		--text-color: white;
-	}
-
-	.floating-buttons {
-		z-index: 1000;
-	}
-
-	.verse-list {
-		list-style: none;
-		padding: 0;
-	}
-
-	.verse-item {
-		margin: 0.5rem 0;
-	}
-
-	.modal {
-		position: fixed;
-		top: 120px;
-		left: 0;
-		width: 100%;
-		height: 70%;
-		display: flex;
-		justify-content: center;
-		align-items: center;
-	}
-
-	.modal-content {
-		background: transparent;
-		right: 20px;
-		padding: 1rem;
-		border-radius: 0.5rem;
-		max-width: 100%;
-		max-height: 90%;
-	}
-
 	
+	.verse {
+		transition: all 0.3s ease;
+		line-height: 1.8;
+	}
+	
+	.verse:hover {
+		background-color: #e9f5ff !important;
+		transform: translateX(3px);
+	}
+	
+	.verse-number {
+		font-size: 0.8em;
+		top: -0.5em;
+	}
+
+	.selector-dropdown {
+		position: fixed;
+		left: 50%;
+		transform: translateX(-50%);
+		top: 100px;
+		width: 90%;
+		max-width: 500px;
+		max-height: 70vh;
+		background: white;
+		border-radius: 8px;
+		z-index: 1000;
+		overflow: hidden;
+		box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+		display: flex;
+		flex-direction: column;
+	}
+
+	.search-box {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+	}
+
+	.dropdown-options {
+		overflow-y: auto;
+		flex-grow: 1;
+		padding: 10px 0;
+	}
+
+	.dropdown-option {
+		padding: 10px 20px;
+		cursor: pointer;
+		transition: background-color 0.2s;
+	}
+
+	.dropdown-option:hover {
+		background-color: #f0f7ff;
+	}
+
+	.dropdown-option.active {
+		background-color: #e0f0ff;
+		font-weight: bold;
+	}
+
+	.bible-content {
+		position: relative;
+		z-index: 1;
+	}
+
+	.nav-tabs {
+		padding: 0 15px;
+		border-bottom: 1px solid #dee2e6;
+	}
+
+	.nav-link {
+		cursor: pointer;
+		border: none;
+		background: none;
+		padding: 10px 15px;
+		color: #495057;
+	}
+
+	.nav-link.active {
+		color: #0d6efd;
+		border-bottom: 2px solid #0d6efd;
+		font-weight: bold;
+	}
+
+	.nav-link.disabled {
+		cursor: not-allowed;
+		opacity: 0.6;
+	}
+
+	.highlight-verse {
+		animation: highlight 2s ease;
+		background-color: #e0f0ff;
+		box-shadow: 0 0 0 2px #a0c4ff;
+	}
+
+	@keyframes highlight {
+		0% { background-color: #e0f0ff; }
+		100% { background-color: inherit; }
+	}
+
+	@media (max-width: 768px) {
+		.bible-text {
+			font-size: 1rem !important;
+		}
+
+		.selector-dropdown {
+			width: 95%;
+			max-height: 60vh;
+			top: 80px;
+		}
+		
+		.nav-tabs {
+			font-size: 0.8rem;
+			display: flex;
+			flex-wrap: nowrap;
+			overflow-x: auto;
+		}
+		
+		.nav-link {
+			padding: 8px 10px;
+			white-space: nowrap;
+		}
+	}
 </style>
