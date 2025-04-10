@@ -14,6 +14,13 @@
 	let searchTerm = '';
 	let activeTab: 'version' | 'book' | 'chapter' | 'verse' = 'version';
 
+	// Nuevas variables para la descarga
+	let downloadProgress = 0;
+	let isDownloading = false;
+	let downloadedBooks = 0;
+	let isOnline = true;
+	let isBibleDownloaded = false;
+
 	// Listas de selección
 	const versions = [
 		'DHH94I',
@@ -97,22 +104,89 @@
 		'REV' // Apocalipsis
 	];
 
+	let totalBooks = books.length;
+
 	const chapters = Array(50)
 		.fill(0)
 		.map((_, i) => (i + 1).toString());
+
+	// Verificar conexión a internet
+	function checkOnlineStatus() {
+		isOnline = navigator.onLine;
+	}
+
+	// Descargar toda la Biblia para almacenamiento offline
+	async function downloadBibleForOffline() {
+		isDownloading = true;
+		downloadedBooks = 0;
+		downloadProgress = 0;
+
+		try {
+			const cache = await caches.open('bible-cache');
+
+			for (const version of versions) {
+				for (const book of books) {
+					const url = `/${version}/${book}.json`;
+
+					const cachedResponse = await cache.match(url);
+					if (!cachedResponse) {
+						try {
+							const response = await fetch(url);
+							if (response.ok) {
+								await cache.put(url, response.clone());
+							}
+						} catch (error) {
+							console.error(`Error descargando ${version}/${book}:`, error);
+						}
+					}
+
+					downloadedBooks++;
+					downloadProgress = Math.floor((downloadedBooks / (versions.length * books.length)) * 100);
+				}
+			}
+
+			isBibleDownloaded = true; // Marcar como descargado
+			alert('¡Descarga completada! La Biblia está ahora disponible offline.');
+		} catch (error) {
+			console.error('Error en la descarga:', error);
+			alert('Hubo un error durante la descarga. Por favor intenta nuevamente.');
+		} finally {
+			isDownloading = false;
+		}
+	}
 
 	// Cargar datos de la Biblia
 	async function loadBible(version: string, book: string) {
 		try {
 			isLoading = true;
-			const response = await fetch(`/${version}/${book}.json`);
-			if (!response.ok) throw new Error(`Error ${response.status}: Archivo no encontrado`);
+			const url = `/${version}/${book}.json`;
 
-			bibleData = await response.json();
+			// Primero intentar con fetch normal
+			if (isOnline) {
+				const response = await fetch(url);
+				if (!response.ok) throw new Error(`Error ${response.status}: Archivo no encontrado`);
+				bibleData = await response.json();
+			} else {
+				// Si estamos offline, buscar en caché
+				const cache = await caches.open('bible-cache');
+				const cachedResponse = await cache.match(url);
+
+				if (cachedResponse) {
+					bibleData = await cachedResponse.json();
+				} else {
+					throw new Error(
+						'Libro no disponible offline. Por favor conéctate a internet para descargarlo.'
+					);
+				}
+			}
+
 			selectedVerse = null;
 		} catch (error) {
 			console.error('Error cargando la Biblia:', error);
 			bibleData = null;
+			if (!isOnline) {
+				alert('No estás conectado a internet y este libro no está disponible offline.');
+			}
 		} finally {
 			isLoading = false;
 		}
@@ -180,7 +254,17 @@
 
 	// Carga inicial
 	onMount(() => {
+		checkOnlineStatus();
+		window.addEventListener('online', checkOnlineStatus);
+		window.addEventListener('offline', checkOnlineStatus);
+
+		// Carga inicial
 		loadBible(selectedVersion, selectedBook);
+
+		return () => {
+			window.removeEventListener('online', checkOnlineStatus);
+			window.removeEventListener('offline', checkOnlineStatus);
+		};
 	});
 </script>
 
@@ -211,6 +295,62 @@
 					</div>
 
 					<div class="card-body bg-light">
+						<!-- Sección de descarga offline -->
+						{#if !isBibleDownloaded}
+							<div class="card-body bg-light">
+								<!-- Sección de descarga offline -->
+								<div class="offline-section mb-4 p-3 bg-white rounded shadow-sm">
+									<h5 class="mb-3">
+										<i class="bi bi-download me-2"></i> Descargar para uso offline
+									</h5>
+									<p class="text-muted mb-3">
+										Descarga toda la Biblia para poder acceder a ella sin conexión a internet.
+									</p>
+
+									{#if isDownloading}
+										<div class="progress mb-2">
+											<div
+												class="progress-bar progress-bar-striped progress-bar-animated"
+												role="progressbar"
+												style={`width: ${downloadProgress}%`}
+												aria-valuenow={downloadProgress}
+												aria-valuemin="0"
+												aria-valuemax="100"
+											>
+												{downloadProgress}%
+											</div>
+										</div>
+										<small class="text-muted">
+											Descargando... {downloadedBooks} de {totalBooks * versions.length} libros
+										</small>
+									{:else}
+										<button
+											class="btn btn-success w-100"
+											on:click={downloadBibleForOffline}
+											disabled={!isOnline}
+										>
+											<i class="bi bi-cloud-arrow-down me-2"></i>
+											Descargar Biblia completa
+										</button>
+										{#if !isOnline}
+											<small class="text-danger mt-2 d-block">
+												<i class="bi bi-exclamation-triangle me-1"></i>
+												Necesitas conexión a internet para descargar la Biblia.
+											</small>
+										{/if}
+									{/if}
+
+									{#if !isOnline}
+										<div class="alert alert-warning mt-3 mb-0">
+											<i class="bi bi-wifi-off me-2"></i>
+											Actualmente estás offline. Solo podrás acceder a los libros que hayas descargado
+											previamente.
+										</div>
+									{/if}
+								</div>
+							</div>
+						{/if}
+
 						<!-- Selector compacto con tabs -->
 						<div class="d-flex justify-content-center mb-4">
 							<button
@@ -462,6 +602,19 @@
 		100% {
 			background-color: inherit;
 		}
+	}
+
+	.offline-section {
+		border-left: 4px solid #28a745;
+	}
+
+	.progress {
+		height: 1.5rem;
+	}
+
+	.progress-bar {
+		font-size: 0.8rem;
+		line-height: 1.5rem;
 	}
 
 	@media (max-width: 768px) {
