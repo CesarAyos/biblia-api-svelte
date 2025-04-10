@@ -28,8 +28,78 @@
 		'TLA',
 		'TLAI'
 	];
-	const books = ['GEN', 'EXO', 'LEV', 'NUM', 'DEU'];
-	const chapters = Array(50).fill(0).map((_, i) => (i + 1).toString());
+	const books = [
+		'GEN', // Génesis
+		'EXO', // Éxodo
+		'LEV', // Levítico
+		'NUM', // Números
+		'DEU', // Deuteronomio
+		'JOS', // Josué
+		'JDG', // Jueces
+		'RUT', // Rut
+		'1SA', // 1 Samuel
+		'2SA', // 2 Samuel
+		'1KI', // 1 Reyes
+		'2KI', // 2 Reyes
+		'1CH', // 1 Crónicas
+		'2CH', // 2 Crónicas
+		'EZR', // Esdras
+		'NEH', // Nehemías
+		'EST', // Ester
+		'JOB', // Job
+		'PSA', // Salmos
+		'PRO', // Proverbios
+		'ECC', // Eclesiastés
+		'SNG', // Cantares
+		'ISA', // Isaías
+		'JER', // Jeremías
+		'LAM', // Lamentaciones
+		'EZK', // Ezequiel
+		'DAN', // Daniel
+		'HOS', // Oseas
+		'JOL', // Joel
+		'AMO', // Amós
+		'OBA', // Abdías
+		'JON', // Jonás
+		'MIC', // Miqueas
+		'NAM', // Nahúm
+		'HAB', // Habacuc
+		'ZEP', // Sofonías
+		'HAG', // Hageo
+		'ZEC', // Zacarías
+		'MAL', // Malaquías
+		'MAT', // Mateo
+		'MRK', // Marcos
+		'LUK', // Lucas
+		'JHN', // Juan
+		'ACT', // Hechos
+		'ROM', // Romanos
+		'1CO', // 1 Corintios
+		'2CO', // 2 Corintios
+		'GAL', // Gálatas
+		'EPH', // Efesios
+		'PHP', // Filipenses
+		'COL', // Colosenses
+		'1TH', // 1 Tesalonicenses
+		'2TH', // 2 Tesalonicenses
+		'1TI', // 1 Timoteo
+		'2TI', // 2 Timoteo
+		'TIT', // Tito
+		'PHM', // Filemón
+		'HEB', // Hebreos
+		'JAS', // Santiago
+		'1PE', // 1 Pedro
+		'2PE', // 2 Pedro
+		'1JN', // 1 Juan
+		'2JN', // 2 Juan
+		'3JN', // 3 Juan
+		'JUD', // Judas
+		'REV' // Apocalipsis
+	];
+
+	const chapters = Array(50)
+		.fill(0)
+		.map((_, i) => (i + 1).toString());
 
 	// Cargar datos de la Biblia
 	async function loadBible(version: string, book: string) {
@@ -90,9 +160,7 @@
 
 	// Filtrar opciones basadas en búsqueda
 	function filterOptions(options: string[], search: string): string[] {
-		return options.filter(option => 
-			option.toLowerCase().includes(search.toLowerCase())
-		);
+		return options.filter((option) => option.toLowerCase().includes(search.toLowerCase()));
 	}
 
 	// Efectos reactivos
@@ -104,9 +172,10 @@
 	$: filteredVersions = filterOptions(versions, searchTerm);
 	$: filteredBooks = filterOptions(books, searchTerm);
 	$: filteredChapters = filterOptions(chapters, searchTerm);
-	$: verses = currentChapter?.items
-		?.filter(item => item.type === 'verse')
-		?.map(item => item.verse_numbers[0].toString()) || [];
+	$: verses =
+		currentChapter?.items
+			?.filter((item) => item.type === 'verse')
+			?.map((item) => item.verse_numbers[0].toString()) || [];
 	$: filteredVerses = filterOptions(verses, searchTerm);
 
 	// Carga inicial
@@ -144,8 +213,8 @@
 					<div class="card-body bg-light">
 						<!-- Selector compacto con tabs -->
 						<div class="d-flex justify-content-center mb-4">
-							<button 
-								class="btn btn-primary dropdown-toggle" 
+							<button
+								class="btn btn-primary dropdown-toggle"
 								on:click={() => {
 									showSelectorDropdown = !showSelectorDropdown;
 									searchTerm = '';
@@ -158,57 +227,57 @@
 						{#if showSelectorDropdown}
 							<div class="selector-dropdown shadow-lg">
 								<div class="search-box p-2 bg-light border-bottom">
-									<input 
-										type="text" 
-										class="form-control" 
-										placeholder="Buscar..." 
+									<input
+										type="text"
+										class="form-control"
+										placeholder="Buscar..."
 										bind:value={searchTerm}
 										autofocus
-									>
+									/>
 								</div>
-								
+
 								<!-- Tabs de navegación -->
 								<ul class="nav nav-tabs">
 									<li class="nav-item">
-										<button 
+										<button
 											class="nav-link {activeTab === 'version' ? 'active' : ''}"
-											on:click={() => activeTab = 'version'}
+											on:click={() => (activeTab = 'version')}
 										>
 											Versión
 										</button>
 									</li>
 									<li class="nav-item">
-										<button 
+										<button
 											class="nav-link {activeTab === 'book' ? 'active' : ''}"
-											on:click={() => activeTab = 'book'}
+											on:click={() => (activeTab = 'book')}
 										>
 											Libro
 										</button>
 									</li>
 									<li class="nav-item">
-										<button 
+										<button
 											class="nav-link {activeTab === 'chapter' ? 'active' : ''}"
-											on:click={() => activeTab = 'chapter'}
+											on:click={() => (activeTab = 'chapter')}
 											disabled={!selectedBook}
 										>
 											Capítulo
 										</button>
 									</li>
 									<li class="nav-item">
-										<button 
+										<button
 											class="nav-link {activeTab === 'verse' ? 'active' : ''}"
-											on:click={() => activeTab = 'verse'}
+											on:click={() => (activeTab = 'verse')}
 											disabled={!selectedChapter || !currentChapter}
 										>
 											Versículo
 										</button>
 									</li>
 								</ul>
-								
+
 								<div class="dropdown-options">
 									{#if activeTab === 'version'}
 										{#each filteredVersions as version}
-											<div 
+											<div
 												class="dropdown-option {selectedVersion === version ? 'active' : ''}"
 												on:click={() => {
 													handleVersionChange(version);
@@ -220,7 +289,7 @@
 										{/each}
 									{:else if activeTab === 'book'}
 										{#each filteredBooks as book}
-											<div 
+											<div
 												class="dropdown-option {selectedBook === book ? 'active' : ''}"
 												on:click={() => {
 													handleBookChange(book);
@@ -232,7 +301,7 @@
 										{/each}
 									{:else if activeTab === 'chapter'}
 										{#each filteredChapters as chapter}
-											<div 
+											<div
 												class="dropdown-option {selectedChapter === chapter ? 'active' : ''}"
 												on:click={() => {
 													handleChapterChange(chapter);
@@ -243,15 +312,17 @@
 											</div>
 										{/each}
 									{:else if activeTab === 'verse'}
-										<div 
+										<div
 											class="dropdown-option {selectedVerse === null ? 'active' : ''}"
 											on:click={() => handleVerseChange(null)}
 										>
 											Todos los versículos
 										</div>
 										{#each filteredVerses as verse}
-											<div 
-												class="dropdown-option {selectedVerse?.toString() === verse ? 'active' : ''}"
+											<div
+												class="dropdown-option {selectedVerse?.toString() === verse
+													? 'active'
+													: ''}"
 												on:click={() => handleVerseChange(parseInt(verse))}
 											>
 												Versículo {verse}
@@ -267,8 +338,13 @@
 								<div class="bible-text fs-5">
 									{#each currentChapter?.items as item}
 										{#if item.type === 'verse'}
-											<div class="verse mb-3 p-3 bg-light rounded" id={'verse-' + item.verse_numbers[0]}>
-												<sup class="verse-number badge bg-primary me-2">{item.verse_numbers.join(', ')}</sup>
+											<div
+												class="verse mb-3 p-3 bg-light rounded"
+												id={'verse-' + item.verse_numbers[0]}
+											>
+												<sup class="verse-number badge bg-primary me-2"
+													>{item.verse_numbers.join(', ')}</sup
+												>
 												<span class="verse-text">{item.lines.join(' ')}</span>
 											</div>
 										{/if}
@@ -295,17 +371,17 @@
 		background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
 		min-height: 100vh;
 	}
-	
+
 	.verse {
 		transition: all 0.3s ease;
 		line-height: 1.8;
 	}
-	
+
 	.verse:hover {
 		background-color: #e9f5ff !important;
 		transform: translateX(3px);
 	}
-	
+
 	.verse-number {
 		font-size: 0.8em;
 		top: -0.5em;
@@ -323,7 +399,7 @@
 		border-radius: 8px;
 		z-index: 1000;
 		overflow: hidden;
-		box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+		box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 		display: flex;
 		flex-direction: column;
 	}
@@ -380,8 +456,12 @@
 	}
 
 	@keyframes highlight {
-		0% { background-color: #e0f0ff; }
-		100% { background-color: inherit; }
+		0% {
+			background-color: #e0f0ff;
+		}
+		100% {
+			background-color: inherit;
+		}
 	}
 
 	@media (max-width: 768px) {
@@ -393,7 +473,7 @@
 			width: 95%;
 			max-height: 60vh;
 		}
-		
+
 		.nav-tabs {
 			font-size: 0.8rem;
 		}
