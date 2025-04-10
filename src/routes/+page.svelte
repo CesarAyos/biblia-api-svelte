@@ -312,7 +312,7 @@
 											<div
 												class="progress-bar progress-bar-striped progress-bar-animated"
 												role="progressbar"
-												style={`width: ${downloadProgress}%`}
+												style="width: {downloadProgress}%"
 												aria-valuenow={downloadProgress}
 												aria-valuemin="0"
 												aria-valuemax="100"
@@ -507,14 +507,17 @@
 </main>
 
 <style>
+	/* Estilos principales */
 	.bg-gradient-primary {
 		background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
 		min-height: 100vh;
 	}
 
+	/* Estilos para versículos */
 	.verse {
 		transition: all 0.3s ease;
 		line-height: 1.8;
+		background-color: #f8f9fa;
 	}
 
 	.verse:hover {
@@ -524,9 +527,11 @@
 
 	.verse-number {
 		font-size: 0.8em;
+		position: relative;
 		top: -0.5em;
 	}
 
+	/* Selector dropdown */
 	.selector-dropdown {
 		position: fixed;
 		left: 50%;
@@ -548,6 +553,8 @@
 		position: sticky;
 		top: 0;
 		z-index: 10;
+		background-color: #f8f9fa;
+		border-bottom: 1px solid #dee2e6;
 	}
 
 	.dropdown-options {
@@ -571,24 +578,7 @@
 		font-weight: bold;
 	}
 
-	.bible-content {
-		position: relative;
-		z-index: 1;
-	}
-
-	.nav-tabs {
-		padding: 0 15px;
-	}
-
-	.nav-link {
-		cursor: pointer;
-	}
-
-	.nav-link.disabled {
-		cursor: not-allowed;
-		opacity: 0.6;
-	}
-
+	/* Efecto de resaltado */
 	.highlight-verse {
 		animation: highlight 2s ease;
 		background-color: #e0f0ff;
@@ -604,19 +594,26 @@
 		}
 	}
 
+	/* Sección offline */
 	.offline-section {
 		border-left: 4px solid #28a745;
+		background-color: #ffffff;
 	}
 
+	/* Progress bar */
 	.progress {
 		height: 1.5rem;
+		border-radius: 0.25rem;
+		background-color: #e9ecef;
 	}
 
 	.progress-bar {
+		background-color: #28a745;
 		font-size: 0.8rem;
 		line-height: 1.5rem;
 	}
 
+	/* Responsive */
 	@media (max-width: 768px) {
 		.bible-text {
 			font-size: 1rem !important;
@@ -625,10 +622,37 @@
 		.selector-dropdown {
 			width: 95%;
 			max-height: 60vh;
+			top: 80px;
 		}
 
-		.nav-tabs {
+		.nav-tabs .nav-item {
 			font-size: 0.8rem;
+			padding: 0.25rem;
 		}
+	}
+
+	/* Clases de utilidad */
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
+	.shadow-sm {
+		box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+	}
+
+	.shadow-lg {
+		box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+	}
+
+	.rounded {
+		border-radius: 0.25rem;
 	}
 </style>
