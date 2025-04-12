@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Book, Chapter, ChapterItem } from '../typs';
-
 	import { writable } from 'svelte/store';
 
 	export const searchResults = writable<SearchResult[]>([]);
@@ -17,6 +16,8 @@
 	let showSelectorDropdown = false;
 	let searchTerm = '';
 	let activeTab: 'version' | 'book' | 'chapter' | 'verse' = 'version';
+	let showCopiedMessage = false;
+	let copiedMessageTimeout: number;
 
 	// Nuevas variables para la descarga
 	let downloadProgress = 0;
@@ -30,6 +31,12 @@
 	let secondVersion = 'NVI';
 	let secondBibleData: Book | null = null;
 	let secondCurrentChapter: Chapter | null = null;
+
+	// Control de tamaño de fuente
+	let fontSize = 16;
+	const minFontSize = 12;
+	const maxFontSize = 24;
+	const step = 1;
 
 	// Listas de selección
 	const versions = [
@@ -428,6 +435,63 @@
 		return options.filter((option) => option.toLowerCase().includes(search.toLowerCase()));
 	}
 
+	// Control de tamaño de fuente
+	function increaseFontSize() {
+		if (fontSize < maxFontSize) {
+			fontSize += step;
+			applyFontSize();
+		}
+	}
+
+	function decreaseFontSize() {
+		if (fontSize > minFontSize) {
+			fontSize -= step;
+			applyFontSize();
+		}
+	}
+
+	function applyFontSize() {
+		document.documentElement.style.setProperty('--bible-font-size', `${fontSize}px`);
+		localStorage.setItem('bibleFontSize', fontSize.toString());
+	}
+
+	// Copiar versículo
+	let pressTimer: number;
+	let pressedVerse: HTMLElement | null = null;
+
+	function handleVersePressStart(event: MouseEvent | TouchEvent, verseNumber: number, verseText: string) {
+		pressedVerse = event.currentTarget as HTMLElement;
+		pressTimer = window.setTimeout(() => {
+			copyVerse(verseNumber, verseText);
+			pressedVerse?.classList.add('verse-copied');
+			setTimeout(() => {
+				pressedVerse?.classList.remove('verse-copied');
+				pressedVerse = null;
+			}, 2000);
+		}, 1000); // 1 segundo para activar la copia
+	}
+
+	function handleVersePressEnd() {
+		if (pressTimer) {
+			clearTimeout(pressTimer);
+		}
+	}
+
+	function copyVerse(verseNumber: number, verseText: string) {
+		const bookName = getBookFullName(selectedBook);
+		const textToCopy = `${bookName} ${selectedChapter}:${verseNumber} - ${verseText}`;
+		
+		navigator.clipboard.writeText(textToCopy).then(() => {
+			showCopiedMessage = true;
+			clearTimeout(copiedMessageTimeout);
+			copiedMessageTimeout = window.setTimeout(() => {
+				showCopiedMessage = false;
+			}, 2000);
+		}).catch(err => {
+			console.error('Error al copiar:', err);
+		});
+	}
+
 	// Efectos reactivos
 	$: if (bibleData && selectedChapter) {
 		currentChapter =
@@ -450,12 +514,15 @@
 
 	// Carga inicial
 	onMount(() => {
+		const savedSize = localStorage.getItem('bibleFontSize');
+		if (savedSize) {
+			fontSize = parseInt(savedSize);
+			applyFontSize();
+		}
 		checkOnlineStatus();
-		checkDownloadStatus(); // Verifica si ya fue descargada
+		checkDownloadStatus();
 		window.addEventListener('online', checkOnlineStatus);
 		window.addEventListener('offline', checkOnlineStatus);
-
-		// Carga inicial
 		loadBible(selectedVersion, selectedBook);
 
 		return () => {
@@ -560,7 +627,7 @@
 
 <main
 	class="container-fluid bg-body text-body py-4 bg-gradient-primary"
-	style="padding-top: 60px; padding-bottom: 60px;"
+	style="padding-top: 60px; padding-bottom: 60px; font-size: var(--bible-font-size)"
 >
 	<div class="row justify-content-center">
 		<div class="col-12 col-lg-10">
@@ -574,29 +641,51 @@
 			{:else}
 				<div class="card shadow-lg mb-4">
 					<div class="card-header bg- textbody-white py-2 scroll2 z-3">
-						<div class="d-flex flex-wrap align-items-center justify-content-center">
-							{#if bibleData && selectedChapter}
-								<span class="fw-bold me-2">{getBookFullName(selectedBook)}</span>
-								<span class="separator d-none d-md-inline me-2">|</span>
-								<span class="badge bg-body text-body me-2">{selectedVersion}</span>
-
-								{#if compareMode}
-									<span class="text-body me-2">vs</span>
-									<span class="badge bg-secondary me-2">{secondVersion}</span>
-								{/if}
-
-								<span class="separator d-none d-md-inline me-2">|</span>
-								<span class="me-2"
-									>Capítulo <span class="badge bg-info">{selectedChapter}</span></span
-								>
-
-								{#if selectedVerse}
+						<div class="d-flex flex-wrap align-items-center justify-content-between">
+							<div class="d-flex align-items-center">
+								{#if bibleData && selectedChapter}
+									<span class="fw-bold me-2">{getBookFullName(selectedBook)}</span>
 									<span class="separator d-none d-md-inline me-2">|</span>
-									<span>Versículo <span class="badge bg-success">{selectedVerse}</span></span>
+									<span class="badge bg-body text-body me-2">{selectedVersion}</span>
+
+									{#if compareMode}
+										<span class="text-body me-2">vs</span>
+										<span class="badge bg-secondary me-2">{secondVersion}</span>
+									{/if}
+
+									<span class="separator d-none d-md-inline me-2">|</span>
+									<span class="me-2"
+										>Capítulo <span class="badge bg-info">{selectedChapter}</span></span
+									>
+
+									{#if selectedVerse}
+										<span class="separator d-none d-md-inline me-2">|</span>
+										<span>Versículo <span class="badge bg-success">{selectedVerse}</span></span>
+									{/if}
+								{:else}
+									<span class="fst-italic">Selecciona un libro y capítulo</span>
 								{/if}
-							{:else}
-								<span class="fst-italic">Selecciona un libro y capítulo</span>
-							{/if}
+							</div>
+							
+							<!-- <div class="font-size-controls">
+								<button
+									class="btn btn-sm btn-outline-secondary"
+									on:click={decreaseFontSize}
+									aria-label="Reducir tamaño de fuente"
+								>
+									<i class="fa-solid fa-font fa-sm"></i> <i class="fa-solid fa-minus fa-xs"></i>
+								</button>
+
+								<span class="mx-2">{fontSize}px</span>
+
+								<button
+									class="btn btn-sm btn-outline-secondary"
+									on:click={increaseFontSize}
+									aria-label="Aumentar tamaño de fuente"
+								>
+									<i class="fa-solid fa-font fa-sm"></i> <i class="fa-solid fa-plus fa-xs"></i>
+								</button>
+							</div> -->
 						</div>
 					</div>
 
@@ -835,6 +924,11 @@
 																? 'verse-difference'
 																: ''}"
 															id={'verse-' + item.verse_numbers[0]}
+															on:mousedown={(e) => handleVersePressStart(e, item.verse_numbers[0], item.lines?.join(' ') || '')}
+															on:mouseup={handleVersePressEnd}
+															on:mouseleave={handleVersePressEnd}
+															on:touchstart={(e) => handleVersePressStart(e, item.verse_numbers[0], item.lines?.join(' ') || '')}
+															on:touchend={handleVersePressEnd}
 														>
 															<sup class="verse-number badge bg-primary me-2"
 																>{item.verse_numbers.join(', ')}</sup
@@ -858,6 +952,11 @@
 																? 'verse-difference'
 																: ''}"
 															id={'verse2-' + item.verse_numbers[0]}
+															on:mousedown={(e) => handleVersePressStart(e, item.verse_numbers[0], item.lines?.join(' ') || '')}
+															on:mouseup={handleVersePressEnd}
+															on:mouseleave={handleVersePressEnd}
+															on:touchstart={(e) => handleVersePressStart(e, item.verse_numbers[0], item.lines?.join(' ') || '')}
+															on:touchend={handleVersePressEnd}
 														>
 															<sup class="verse-number badge bg-primary me-2"
 																>{item.verse_numbers.join(', ')}</sup
@@ -878,6 +977,11 @@
 												<div
 													class="verse mb-3 p-3 bg-body rounded"
 													id={'verse-' + item.verse_numbers[0]}
+													on:mousedown={(e) => handleVersePressStart(e, item.verse_numbers[0], item.lines?.join(' ') || '')}
+													on:mouseup={handleVersePressEnd}
+													on:mouseleave={handleVersePressEnd}
+													on:touchstart={(e) => handleVersePressStart(e, item.verse_numbers[0], item.lines?.join(' ') || '')}
+													on:touchend={handleVersePressEnd}
 												>
 													<sup class="verse-number badge bg-primary me-2"
 														>{item.verse_numbers.join(', ')}</sup
@@ -904,12 +1008,51 @@
 	</div>
 </main>
 
+{#if showCopiedMessage}
+	<div class="copied-message">
+		Versículo copiado al portapapeles
+	</div>
+{/if}
+
 <style>
+	:root {
+		--bible-font-size: 16px; /* Valor por defecto */
+	}
+
+	.bible-content {
+		font-size: var(--bible-font-size);
+	}
+
+	.bible-text {
+		font-size: var(--bible-font-size);
+		line-height: calc(var(--bible-font-size) * 1.6);
+	}
+
+	.verse-number {
+		font-size: calc(var(--bible-font-size) * 0.8);
+	}
+
+	/* Estilos para los controles */
+	.font-size-controls {
+		background-color: var(--bs-body-bg);
+		padding: 0.25rem 0.5rem;
+		border-radius: 0.25rem;
+	}
+
+	.font-size-controls button {
+		width: 2rem;
+		height: 2rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
 	/* Estilos para versículos */
 	.verse {
 		transition: all 0.3s ease;
 		line-height: 1.8;
 		background-color: var(--bs-light-bg-subtle);
+		position: relative;
 	}
 
 	.verse:hover {
@@ -917,10 +1060,36 @@
 		transform: translateX(3px);
 	}
 
+	.verse-copied {
+		background-color: var(--bs-success-bg-subtle) !important;
+		border-left: 3px solid var(--bs-success);
+	}
+
 	.verse-number {
 		font-size: 0.8em;
 		position: relative;
 		top: -0.5em;
+	}
+
+	/* Mensaje de copiado */
+	.copied-message {
+		position: fixed;
+		bottom: 20px;
+		left: 50%;
+		transform: translateX(-50%);
+		background-color: var(--bs-success);
+		color: white;
+		padding: 10px 20px;
+		border-radius: 4px;
+		z-index: 2000;
+		animation: fadeInOut 2s ease-in-out;
+	}
+
+	@keyframes fadeInOut {
+		0% { opacity: 0; }
+		20% { opacity: 1; }
+		80% { opacity: 1; }
+		100% { opacity: 0; }
 	}
 
 	/* Selector dropdown */
@@ -1043,7 +1212,7 @@
 			left: 0;
 			width: 100%;
 			padding: 0.5rem;
-			margin: 0 !important; /* Sobreescribe cualquier margen */
+			margin: 0 !important;
 		}
 
 		.scroll input {
@@ -1089,20 +1258,20 @@
 
 	/* Asegura que el contenido principal no quede oculto */
 	main {
-		padding-bottom: 60px; /* Espacio para la barra inferior */
-		padding-top: 60px; /* Espacio para el buscador */
+		padding-bottom: 60px;
+		padding-top: 60px;
 	}
 
 	/* Ajusta el z-index del dropdown para que aparezca sobre todo */
 	.selector-dropdown {
 		z-index: 1100;
-		top: 60px !important; /* Debajo del buscador */
+		top: 60px !important;
 	}
 
 	/* Botón flotante del selector */
 	.btn-floating-selector {
 		position: fixed;
-		bottom: 70px; /* Encima de la barra de información */
+		bottom: 70px;
 		right: 20px;
 		width: 60px;
 		height: 60px;
