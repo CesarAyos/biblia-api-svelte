@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { Book, Chapter } from '../typs';
+	import type { Book, Chapter, ChapterItem } from '../typs';
+	
+	import { writable } from 'svelte/store';
+
+	export const searchResults = writable<SearchResult[]>([]);
 
 	// Estado de la aplicación
 	let selectedVersion = 'RVR1960';
@@ -308,7 +312,7 @@
 			isDownloading = false;
 		}
 
-        markBibleAsDownloaded();
+		markBibleAsDownloaded();
 	}
 
 	// Cargar la segunda versión para comparación
@@ -446,33 +450,106 @@
 
 	// Carga inicial
 	onMount(() => {
-    checkOnlineStatus();
-    checkDownloadStatus(); // Verifica si ya fue descargada
-    window.addEventListener('online', checkOnlineStatus);
-    window.addEventListener('offline', checkOnlineStatus);
+		checkOnlineStatus();
+		checkDownloadStatus(); // Verifica si ya fue descargada
+		window.addEventListener('online', checkOnlineStatus);
+		window.addEventListener('offline', checkOnlineStatus);
 
-    // Carga inicial
-    loadBible(selectedVersion, selectedBook);
+		// Carga inicial
+		loadBible(selectedVersion, selectedBook);
 
-    return () => {
-        window.removeEventListener('online', checkOnlineStatus);
-        window.removeEventListener('offline', checkOnlineStatus);
+		return () => {
+			window.removeEventListener('online', checkOnlineStatus);
+			window.removeEventListener('offline', checkOnlineStatus);
+		};
+	});
+
+	function markBibleAsDownloaded() {
+		localStorage.setItem('bibleDownloaded', 'true');
+		isBibleDownloaded = true;
+	}
+
+	function checkDownloadStatus() {
+		const downloaded = localStorage.getItem('bibleDownloaded') === 'true';
+		isBibleDownloaded = downloaded;
+	}
+
+
+	type SearchResult = {
+        book: string;
+        chapter: string;
+        verse: string;
+        text: string;
     };
-});
 
+	async function searchVerses(searchTerm: string) {
+        if (!searchTerm.trim()) {
+            searchResults.set([]);
+            return;
+        }
 
-    function markBibleAsDownloaded() {
-    localStorage.setItem('bibleDownloaded', 'true');
-    isBibleDownloaded = true;
-}
+        const results: SearchResult[] = [];
 
-function checkDownloadStatus() {
-    const downloaded = localStorage.getItem('bibleDownloaded') === 'true';
-    isBibleDownloaded = downloaded;
-}
+        for (const book of books) {
+            try {
+                const url = `/${selectedVersion}/${book}.json`;
+                let bookData: Book | null = null;
 
+                if (isOnline) {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Error ${response.status}`);
+                    bookData = await response.json();
+                } else {
+                    const cache = await caches.open('bible-cache');
+                    const cachedResponse = await cache.match(url);
+                    if (cachedResponse) {
+                        bookData = await cachedResponse.json();
+                    } else {
+                        console.warn(`Libro no disponible offline: ${book}`);
+                        continue;
+                    }
+                }
 
+                bookData?.chapters.forEach((chapter) => {
+                    chapter.items.forEach((item) => {
+                        if (item.type === 'verse') {
+                            const verseText = item.lines?.join(' ') || '';
+                            if (verseText.toLowerCase().includes(searchTerm.toLowerCase())) {
+                                results.push({
+                                    book: getBookFullName(book),
+                                    chapter: chapter.chapter_usfm.replace(/\D/g, ''),
+                                    verse: item.verse_numbers?.join(', ') || '',
+                                    text: verseText
+                                });
+                            }
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error(`Error cargando el libro ${book}:`, error);
+            }
+        }
+
+        searchResults.set(results);
+    }
+
+	function handleSearch() {
+		searchVerses(searchTerm);
+	}
 </script>
+
+<input type="text" bind:value={searchTerm} placeholder="Introduce palabra o frase..." />
+<button on:click={handleSearch}>Buscar en toda la Biblia</button>
+
+{#if $searchResults.length > 0}
+	<ul>
+		{#each $searchResults as result}
+			<li>
+				<strong>{result.book} {result.chapter}:{result.verse}</strong> - {result.text}
+			</li>
+		{/each}
+	</ul>
+{/if}
 
 <main class="container-fluid py-4 bg-gradient-primary">
 	<div class="row justify-content-center">
@@ -564,7 +641,7 @@ function checkDownloadStatus() {
 								{#if compareMode}
 									<i class="bi bi-x-circle me-2"></i>Salir de comparación
 								{:else}
-									<i class="bi bi-file-diff me-2"> Comparar versiones</i> 
+									<i class="bi bi-file-diff me-2"> Comparar versiones</i>
 								{/if}
 							</button>
 						</div>
