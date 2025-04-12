@@ -871,16 +871,9 @@
 
 
 <style>
-	/* Estilos principales */
-	.bg-gradient-primary {
-		background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-		min-height: 100vh;
-	}
+	
 
-	/* Ajustes para dark mode de Bootstrap */
-	[data-bs-theme="dark"] .bg-gradient-primary {
-		background: linear-gradient(135deg, #0f1c39 0%, #152849 100%);
-	}
+	
 
 	/* Estilos para versículos */
 	.verse {
@@ -889,9 +882,7 @@
 		background-color: var(--bs-light-bg-subtle);
 	}
 
-	[data-bs-theme="dark"] .verse {
-		background-color: var(--bs-dark-bg-subtle);
-	}
+	
 
 	.verse:hover {
 		background-color: var(--bs-primary-bg-subtle) !important;
