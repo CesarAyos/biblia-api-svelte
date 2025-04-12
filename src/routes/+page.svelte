@@ -535,30 +535,28 @@
 	function handleSearch() {
 		searchVerses(searchTerm);
 	}
-
-
-	
 </script>
-<button id="theme-toggle" class="btn btn-outline-secondary "><i class="fa-solid fa-circle-half-stroke"></i></button>
 
+<button id="theme-toggle" class="btn btn-outline-secondary" aria-label="dark"
+	><i class="fa-solid fa-circle-half-stroke"></i></button
+>
 
-<div class="d-flex justify-content-center m-2">
+<div class="d-flex bg-body justify-content-center m-2 scroll z-2">
 	<input type="text" bind:value={searchTerm} placeholder="Buscar en la biblia" />
 	<button class="btn btn-warning" on:click={handleSearch}>Buscar</button>
 </div>
 
 <div class="container bg-body text-body z-3">
-    {#if $searchResults.length > 0}
-        <ul class="list-group" role="list" aria-live="polite">
-            {#each $searchResults as result}
-                <li class="list-group-item bg-body text-body" role="listitem">
-                    <strong>{result.book} {result.chapter}:{result.verse}</strong> - {result.text}
-                </li>
-            {/each}
-        </ul>
-    {/if}
+	{#if $searchResults.length > 0}
+		<ul class="list-group" role="list" aria-live="polite">
+			{#each $searchResults as result}
+				<li class="list-group-item bg-body text-body" role="listitem">
+					<strong>{result.book} {result.chapter}:{result.verse}</strong> - {result.text}
+				</li>
+			{/each}
+		</ul>
+	{/if}
 </div>
-
 
 <main class="container-fluid bg-body text-body py-4 bg-gradient-primary">
 	<div class="row justify-content-center">
@@ -572,21 +570,23 @@
 				</div>
 			{:else}
 				<div class="card shadow-lg mb-4">
-					<div class="card-header bg-dark text-white py-2">
+					<div class="card-header bg- textbody-white py-2 scroll2 z-3">
 						<div class="d-flex flex-wrap align-items-center justify-content-center">
 							{#if bibleData && selectedChapter}
 								<span class="fw-bold me-2">{getBookFullName(selectedBook)}</span>
 								<span class="separator d-none d-md-inline me-2">|</span>
 								<span class="badge bg-body text-body me-2">{selectedVersion}</span>
-								
+
 								{#if compareMode}
 									<span class="text-body me-2">vs</span>
 									<span class="badge bg-secondary me-2">{secondVersion}</span>
 								{/if}
-								
+
 								<span class="separator d-none d-md-inline me-2">|</span>
-								<span class="me-2">Capítulo <span class="badge bg-info">{selectedChapter}</span></span>
-								
+								<span class="me-2"
+									>Capítulo <span class="badge bg-info">{selectedChapter}</span></span
+								>
+
 								{#if selectedVerse}
 									<span class="separator d-none d-md-inline me-2">|</span>
 									<span>Versículo <span class="badge bg-success">{selectedVerse}</span></span>
@@ -596,7 +596,6 @@
 							{/if}
 						</div>
 					</div>
-					
 
 					<div class="card-body bg-body">
 						<!-- Sección de descarga offline -->
@@ -638,6 +637,7 @@
 						<div class="d-flex justify-content-center mb-3">
 							<button
 								class="btn btn-primary dropdown-toggle z-3 position-fixed bottom-0 end-0 m-3"
+								aria-label="Selector de versión"
 								style="font-size: 2rem;"
 								on:click={() => {
 									showSelectorDropdown = !showSelectorDropdown;
@@ -662,7 +662,7 @@
 						<!-- Selector de segunda versión cuando esté en modo comparación -->
 						{#if compareMode && showSelectorDropdown === false}
 							<div class="mb-3">
-								<label class="form-label text-body">Comparar con:</label>
+								<p class="form-label text-body">Comparar con:</p>
 								<select
 									class="form-select bg-body text-body"
 									bind:value={secondVersion}
@@ -678,6 +678,7 @@
 						{#if showSelectorDropdown}
 							<div class="selector-dropdown shadow-lg bg-body">
 								<div class="search-box p-2 bg-body border-bottom">
+									<!-- svelte-ignore a11y_autofocus -->
 									<input
 										type="text"
 										class="form-control bg-body text-body"
@@ -806,7 +807,8 @@
 															<sup class="verse-number badge bg-primary me-2"
 																>{item.verse_numbers.join(', ')}</sup
 															>
-															<span class="verse-text text-body">{item.lines?.join(' ') || ''}</span>
+															<span class="verse-text text-body">{item.lines?.join(' ') || ''}</span
+															>
 														</div>
 													{/if}
 												{/each}
@@ -828,7 +830,8 @@
 															<sup class="verse-number badge bg-primary me-2"
 																>{item.verse_numbers.join(', ')}</sup
 															>
-															<span class="verse-text text-body">{item.lines?.join(' ') || ''}</span>
+															<span class="verse-text text-body">{item.lines?.join(' ') || ''}</span
+															>
 														</div>
 													{/if}
 												{/each}
@@ -869,20 +872,13 @@
 	</div>
 </main>
 
-
 <style>
-	
-
-	
-
 	/* Estilos para versículos */
 	.verse {
 		transition: all 0.3s ease;
 		line-height: 1.8;
 		background-color: var(--bs-light-bg-subtle);
 	}
-
-	
 
 	.verse:hover {
 		background-color: var(--bs-primary-bg-subtle) !important;
@@ -978,6 +974,23 @@
 		height: 60vh;
 		overflow-y: auto;
 		scroll-behavior: smooth;
+	}
+
+	.scroll {
+		overflow-y: auto;
+		scroll-behavior: smooth;
+		position: fixed;
+		top: 0;
+		left: 80px;
+	}
+
+	.scroll2 {
+		overflow-y: auto;
+		scroll-behavior: smooth;
+		position: fixed;
+		width: 100%;
+		top: 880px;
+		left: 0px;
 	}
 
 	.verse-difference {
