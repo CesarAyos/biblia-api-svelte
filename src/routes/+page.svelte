@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Book, Chapter, ChapterItem } from '../typs';
-	
+
 	import { writable } from 'svelte/store';
 
 	export const searchResults = writable<SearchResult[]>([]);
@@ -474,125 +474,138 @@
 		isBibleDownloaded = downloaded;
 	}
 
-
 	type SearchResult = {
-        book: string;
-        chapter: string;
-        verse: string;
-        text: string;
-    };
+		book: string;
+		chapter: string;
+		verse: string;
+		text: string;
+	};
 
 	async function searchVerses(searchTerm: string) {
-        if (!searchTerm.trim()) {
-            searchResults.set([]);
-            return;
-        }
+		if (!searchTerm.trim()) {
+			searchResults.set([]);
+			return;
+		}
 
-        const results: SearchResult[] = [];
+		const results: SearchResult[] = [];
 
-        for (const book of books) {
-            try {
-                const url = `/${selectedVersion}/${book}.json`;
-                let bookData: Book | null = null;
+		for (const book of books) {
+			try {
+				const url = `/${selectedVersion}/${book}.json`;
+				let bookData: Book | null = null;
 
-                if (isOnline) {
-                    const response = await fetch(url);
-                    if (!response.ok) throw new Error(`Error ${response.status}`);
-                    bookData = await response.json();
-                } else {
-                    const cache = await caches.open('bible-cache');
-                    const cachedResponse = await cache.match(url);
-                    if (cachedResponse) {
-                        bookData = await cachedResponse.json();
-                    } else {
-                        console.warn(`Libro no disponible offline: ${book}`);
-                        continue;
-                    }
-                }
+				if (isOnline) {
+					const response = await fetch(url);
+					if (!response.ok) throw new Error(`Error ${response.status}`);
+					bookData = await response.json();
+				} else {
+					const cache = await caches.open('bible-cache');
+					const cachedResponse = await cache.match(url);
+					if (cachedResponse) {
+						bookData = await cachedResponse.json();
+					} else {
+						console.warn(`Libro no disponible offline: ${book}`);
+						continue;
+					}
+				}
 
-                bookData?.chapters.forEach((chapter) => {
-                    chapter.items.forEach((item) => {
-                        if (item.type === 'verse') {
-                            const verseText = item.lines?.join(' ') || '';
-                            if (verseText.toLowerCase().includes(searchTerm.toLowerCase())) {
-                                results.push({
-                                    book: getBookFullName(book),
-                                    chapter: chapter.chapter_usfm.replace(/\D/g, ''),
-                                    verse: item.verse_numbers?.join(', ') || '',
-                                    text: verseText
-                                });
-                            }
-                        }
-                    });
-                });
-            } catch (error) {
-                console.error(`Error cargando el libro ${book}:`, error);
-            }
-        }
+				bookData?.chapters.forEach((chapter) => {
+					chapter.items.forEach((item) => {
+						if (item.type === 'verse') {
+							const verseText = item.lines?.join(' ') || '';
+							if (verseText.toLowerCase().includes(searchTerm.toLowerCase())) {
+								results.push({
+									book: getBookFullName(book),
+									chapter: chapter.chapter_usfm.replace(/\D/g, ''),
+									verse: item.verse_numbers?.join(', ') || '',
+									text: verseText
+								});
+							}
+						}
+					});
+				});
+			} catch (error) {
+				console.error(`Error cargando el libro ${book}:`, error);
+			}
+		}
 
-        searchResults.set(results);
-    }
+		searchResults.set(results);
+	}
 
 	function handleSearch() {
 		searchVerses(searchTerm);
 	}
+
+
+	
 </script>
+<button id="theme-toggle" class="btn btn-primary "></button>
 
-<input type="text" bind:value={searchTerm} placeholder="Introduce palabra o frase..." />
-<button on:click={handleSearch}>Buscar en toda la Biblia</button>
 
-{#if $searchResults.length > 0}
-	<ul>
-		{#each $searchResults as result}
-			<li>
-				<strong>{result.book} {result.chapter}:{result.verse}</strong> - {result.text}
-			</li>
-		{/each}
-	</ul>
-{/if}
+<div class="d-flex justify-content-center m-2">
+	<input type="text" bind:value={searchTerm} placeholder="Buscar en la biblia" />
+	<button class="btn btn-warning" on:click={handleSearch}>Buscar</button>
+</div>
 
-<main class="container-fluid py-4 bg-gradient-primary">
+<div class="container bg-body text-body z-3">
+    {#if $searchResults.length > 0}
+        <ul class="list-group" role="list" aria-live="polite">
+            {#each $searchResults as result}
+                <li class="list-group-item bg-body text-body" role="listitem">
+                    <strong>{result.book} {result.chapter}:{result.verse}</strong> - {result.text}
+                </li>
+            {/each}
+        </ul>
+    {/if}
+</div>
+
+
+<main class="container-fluid bg-body text-body py-4 bg-gradient-primary">
 	<div class="row justify-content-center">
 		<div class="col-12 col-lg-10">
 			{#if isLoading}
 				<div class="text-center py-5">
-					<div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+					<div class="spinner-border text-body" style="width: 3rem; height: 3rem;" role="status">
 						<span class="visually-hidden">Cargando...</span>
 					</div>
-					<p class="h4 text-light mt-3">Cargando nueva versión...</p>
+					<p class="h4 text-body mt-3">Cargando nueva versión...</p>
 				</div>
 			{:else}
 				<div class="card shadow-lg mb-4">
-					<div class="card-header bg-dark text-white py-3">
-						<h2 class="h4 mb-0 text-center">
+					<div class="card-header bg-dark text-white py-2">
+						<div class="d-flex flex-wrap align-items-center justify-content-center">
 							{#if bibleData && selectedChapter}
-								<span class="d-block d-md-inline">{getBookFullName(selectedBook)}</span>
-								<span class="d-none d-md-inline mx-2">-</span>
-								<span class="d-block d-md-inline">{selectedVersion}</span>
+								<span class="fw-bold me-2">{getBookFullName(selectedBook)}</span>
+								<span class="separator d-none d-md-inline me-2">|</span>
+								<span class="badge bg-body text-body me-2">{selectedVersion}</span>
+								
 								{#if compareMode}
-									<span class="d-none d-md-inline mx-2">vs</span>
-									<span class="d-block d-md-inline">{secondVersion}</span>
+									<span class="text-body me-2">vs</span>
+									<span class="badge bg-secondary me-2">{secondVersion}</span>
 								{/if}
-								<span class="d-none d-md-inline mx-2">-</span>
-								<span class="d-block d-md-inline">Capítulo {selectedChapter}</span>
+								
+								<span class="separator d-none d-md-inline me-2">|</span>
+								<span class="me-2">Capítulo <span class="badge bg-info">{selectedChapter}</span></span>
+								
 								{#if selectedVerse}
-									<span class="d-none d-md-inline mx-2">-</span>
-									<span class="d-block d-md-inline">Versículo {selectedVerse}</span>
+									<span class="separator d-none d-md-inline me-2">|</span>
+									<span>Versículo <span class="badge bg-success">{selectedVerse}</span></span>
 								{/if}
 							{:else}
-								Selecciona un libro y capítulo
+								<span class="fst-italic">Selecciona un libro y capítulo</span>
 							{/if}
-						</h2>
+						</div>
 					</div>
+					
 
-					<div class="card-body bg-light">
+					<div class="card-body bg-body">
 						<!-- Sección de descarga offline -->
 						{#if !isBibleDownloaded && isOnline}
-							<div class="offline-section mb-4 p-3 bg-white rounded shadow-sm">
+							<div class="offline-section mb-4 p-3 bg-body rounded shadow-sm">
 								<h5 class="mb-3">
 									<i class="bi bi-download me-2"></i> Descargar para uso offline
 								</h5>
-								<p class="text-muted mb-3">
+								<p class="text-body mb-3">
 									Descarga toda la Biblia para poder acceder a ella sin conexión a internet.
 								</p>
 
@@ -609,7 +622,7 @@
 											{downloadProgress}%
 										</div>
 									</div>
-									<small class="text-muted">
+									<small class="text-body">
 										Descargando... {downloadedBooks} de {totalBooks * versions.length} libros
 									</small>
 								{:else}
@@ -649,9 +662,9 @@
 						<!-- Selector de segunda versión cuando esté en modo comparación -->
 						{#if compareMode && showSelectorDropdown === false}
 							<div class="mb-3">
-								<label class="form-label">Comparar con:</label>
+								<label class="form-label text-body">Comparar con:</label>
 								<select
-									class="form-select"
+									class="form-select bg-body text-body"
 									bind:value={secondVersion}
 									on:change={() => loadSecondBible(secondVersion, selectedBook)}
 								>
@@ -663,11 +676,11 @@
 						{/if}
 
 						{#if showSelectorDropdown}
-							<div class="selector-dropdown shadow-lg">
-								<div class="search-box p-2 bg-light border-bottom">
+							<div class="selector-dropdown shadow-lg bg-body">
+								<div class="search-box p-2 bg-body border-bottom">
 									<input
 										type="text"
-										class="form-control"
+										class="form-control bg-body text-body"
 										placeholder="Buscar..."
 										bind:value={searchTerm}
 										autofocus
@@ -711,7 +724,7 @@
 									</li>
 								</ul>
 
-								<div class="dropdown-options">
+								<div class="dropdown-options bg-body">
 									{#if activeTab === 'version'}
 										{#each filteredVersions as version}
 											<div
@@ -774,7 +787,7 @@
 
 						<!-- Contenido bíblico -->
 						{#if bibleData && currentChapter}
-							<div class="bg-white p-4 rounded shadow-sm bible-content">
+							<div class="bg-body p-4 rounded shadow-sm bible-content">
 								{#if compareMode && secondCurrentChapter}
 									<!-- Modo comparación - dos columnas -->
 									<div class="row">
@@ -784,7 +797,7 @@
 												{#each currentChapter?.items as item}
 													{#if item.type === 'verse'}
 														<div
-															class="verse mb-3 p-3 bg-light rounded {selectedVerse?.toString() ===
+															class="verse mb-3 p-3 bg-body rounded {selectedVerse?.toString() ===
 															item.verse_numbers[0].toString()
 																? 'verse-difference'
 																: ''}"
@@ -793,7 +806,7 @@
 															<sup class="verse-number badge bg-primary me-2"
 																>{item.verse_numbers.join(', ')}</sup
 															>
-															<span class="verse-text">{item.lines.join(' ')}</span>
+															<span class="verse-text text-body">{item.lines?.join(' ') || ''}</span>
 														</div>
 													{/if}
 												{/each}
@@ -806,7 +819,7 @@
 												{#each secondCurrentChapter?.items as item}
 													{#if item.type === 'verse'}
 														<div
-															class="verse mb-3 p-3 bg-light rounded {selectedVerse?.toString() ===
+															class="verse mb-3 p-3 bg-body rounded {selectedVerse?.toString() ===
 															item.verse_numbers[0].toString()
 																? 'verse-difference'
 																: ''}"
@@ -815,7 +828,7 @@
 															<sup class="verse-number badge bg-primary me-2"
 																>{item.verse_numbers.join(', ')}</sup
 															>
-															<span class="verse-text">{item.lines.join(' ')}</span>
+															<span class="verse-text text-body">{item.lines?.join(' ') || ''}</span>
 														</div>
 													{/if}
 												{/each}
@@ -828,13 +841,13 @@
 										{#each currentChapter?.items as item}
 											{#if item.type === 'verse'}
 												<div
-													class="verse mb-3 p-3 bg-light rounded"
+													class="verse mb-3 p-3 bg-body rounded"
 													id={'verse-' + item.verse_numbers[0]}
 												>
 													<sup class="verse-number badge bg-primary me-2"
 														>{item.verse_numbers.join(', ')}</sup
 													>
-													<span class="verse-text">{item.lines.join(' ')}</span>
+													<span class="verse-text text-body">{item.lines?.join(' ') || ''}</span>
 												</div>
 											{/if}
 										{/each}
@@ -843,8 +856,8 @@
 							</div>
 						{:else}
 							<div class="text-center py-5">
-								<i class="bi bi-book fs-1 text-muted"></i>
-								<p class="h4 text-muted mt-3">
+								<i class="bi bi-book fs-1 text-body"></i>
+								<p class="h4 text-body mt-3">
 									{selectedBook ? 'Selecciona un capítulo' : 'Selecciona un libro'}
 								</p>
 							</div>
@@ -856,6 +869,7 @@
 	</div>
 </main>
 
+
 <style>
 	/* Estilos principales */
 	.bg-gradient-primary {
@@ -863,15 +877,24 @@
 		min-height: 100vh;
 	}
 
+	/* Ajustes para dark mode de Bootstrap */
+	[data-bs-theme="dark"] .bg-gradient-primary {
+		background: linear-gradient(135deg, #0f1c39 0%, #152849 100%);
+	}
+
 	/* Estilos para versículos */
 	.verse {
 		transition: all 0.3s ease;
 		line-height: 1.8;
-		background-color: #f8f9fa;
+		background-color: var(--bs-light-bg-subtle);
+	}
+
+	[data-bs-theme="dark"] .verse {
+		background-color: var(--bs-dark-bg-subtle);
 	}
 
 	.verse:hover {
-		background-color: #e9f5ff !important;
+		background-color: var(--bs-primary-bg-subtle) !important;
 		transform: translateX(3px);
 	}
 
@@ -890,21 +913,23 @@
 		width: 90%;
 		max-width: 500px;
 		max-height: 70vh;
-		background: white;
+		background-color: var(--bs-body-bg);
+		color: var(--bs-body-color);
 		border-radius: 8px;
 		z-index: 1000;
 		overflow: hidden;
 		box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 		display: flex;
 		flex-direction: column;
+		border: 1px solid var(--bs-border-color);
 	}
 
 	.search-box {
 		position: sticky;
 		top: 0;
 		z-index: 10;
-		background-color: #f8f9fa;
-		border-bottom: 1px solid #dee2e6;
+		background-color: var(--bs-body-bg);
+		border-bottom: 1px solid var(--bs-border-color);
 	}
 
 	.dropdown-options {
@@ -917,20 +942,21 @@
 		padding: 10px 20px;
 		cursor: pointer;
 		transition: background-color 0.2s;
+		color: var(--bs-body-color);
 	}
 
 	.dropdown-option:hover {
-		background-color: #f0f7ff;
+		background-color: var(--bs-tertiary-bg);
 	}
 
 	.dropdown-option.active {
-		background-color: #e0f0ff;
+		background-color: var(--bs-primary-bg-subtle);
 		font-weight: bold;
 	}
 
 	@keyframes highlight {
 		0% {
-			background-color: #e0f0ff;
+			background-color: var(--bs-primary-bg-subtle);
 		}
 		100% {
 			background-color: inherit;
@@ -939,19 +965,19 @@
 
 	/* Sección offline */
 	.offline-section {
-		border-left: 4px solid #28a745;
-		background-color: #ffffff;
+		border-left: 4px solid var(--bs-success);
+		background-color: var(--bs-body-bg);
 	}
 
 	/* Progress bar */
 	.progress {
 		height: 1.5rem;
 		border-radius: 0.25rem;
-		background-color: #e9ecef;
+		background-color: var(--bs-secondary-bg);
 	}
 
 	.progress-bar {
-		background-color: #28a745;
+		background-color: var(--bs-success);
 		font-size: 0.8rem;
 		line-height: 1.5rem;
 	}
@@ -964,8 +990,8 @@
 	}
 
 	.verse-difference {
-		background-color: #fff8e1;
-		border-left: 3px solid #ffc107;
+		background-color: var(--bs-warning-bg-subtle);
+		border-left: 3px solid var(--bs-warning);
 	}
 
 	/* Responsive */
@@ -1004,14 +1030,18 @@
 	}
 
 	.shadow-sm {
-		box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+		box-shadow: var(--bs-box-shadow-sm);
 	}
 
 	.shadow-lg {
-		box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+		box-shadow: var(--bs-box-shadow-lg);
 	}
 
 	.rounded {
-		border-radius: 0.25rem;
+		border-radius: var(--bs-border-radius);
+	}
+
+	.separator {
+		opacity: 0.6;
 	}
 </style>

@@ -3,12 +3,12 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
-  "ts-node": {
-    "compilerOptions": {
-      "module": "ESNext",
-      "esModuleInterop": true
-    }
-  },
+	"ts-node": {
+		"compilerOptions": {
+			"module": "ESNext",
+			"esModuleInterop": true
+		}
+	},
 	"scripts": {
 		"generate-bible": "ts-node src/lib/generateBibleJson.ts",
 		"dev": "vite dev",
@@ -34,6 +34,7 @@
 		"vite": "^6.0.0"
 	},
 	"dependencies": {
+		"bootstrap-icons": "^1.11.3",
 		"dexie": "^4.0.11",
 		"fake-indexeddb": "^6.0.0"
 	}
