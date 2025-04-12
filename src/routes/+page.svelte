@@ -539,7 +539,7 @@
 
 	
 </script>
-<button id="theme-toggle" class="btn btn-primary "></button>
+<button id="theme-toggle" class="btn btn-outline-secondary "><i class="fa-solid fa-circle-half-stroke"></i></button>
 
 
 <div class="d-flex justify-content-center m-2">
@@ -644,7 +644,7 @@
 									searchTerm = '';
 								}}
 							>
-								<i class="bi bi-gear-fill me-2"></i>🕁
+								<i class="fa-solid fa-cross"></i>
 							</button>
 
 							<button
