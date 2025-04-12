@@ -558,7 +558,10 @@
 	{/if}
 </div>
 
-<main class="container-fluid bg-body text-body py-4 bg-gradient-primary">
+<main
+	class="container-fluid bg-body text-body py-4 bg-gradient-primary"
+	style="padding-top: 60px; padding-bottom: 60px;"
+>
 	<div class="row justify-content-center">
 		<div class="col-12 col-lg-10">
 			{#if isLoading}
@@ -636,9 +639,8 @@
 						<!-- Selector y botón de comparación -->
 						<div class="d-flex justify-content-center mb-3">
 							<button
-								class="btn btn-primary dropdown-toggle z-3 position-fixed bottom-0 end-0 m-3"
+								class="btn btn-primary btn-floating-selector"
 								aria-label="Selector de versión"
-								style="font-size: 2rem;"
 								on:click={() => {
 									showSelectorDropdown = !showSelectorDropdown;
 									searchTerm = '';
@@ -728,58 +730,88 @@
 								<div class="dropdown-options bg-body">
 									{#if activeTab === 'version'}
 										{#each filteredVersions as version}
-											<div
+											<button
 												class="dropdown-option {selectedVersion === version ? 'active' : ''}"
 												on:click={() => {
 													handleVersionChange(version);
 													activeTab = 'book';
 												}}
+												on:keydown={(e) =>
+													e.key === 'Enter' &&
+													(() => {
+														handleVersionChange(version);
+														activeTab = 'book';
+													})()}
+												role="option"
+												aria-selected={selectedVersion === version}
 											>
 												{version}
-											</div>
+											</button>
 										{/each}
 									{:else if activeTab === 'book'}
 										{#each filteredBooks as book}
-											<div
+											<button
 												class="dropdown-option {selectedBook === book ? 'active' : ''}"
 												on:click={() => {
 													handleBookChange(book);
 													activeTab = 'chapter';
 												}}
+												on:keydown={(e) =>
+													e.key === 'Enter' &&
+													(() => {
+														handleBookChange(book);
+														activeTab = 'chapter';
+													})()}
+												role="option"
+												aria-selected={selectedBook === book}
 											>
 												{getBookFullName(book)}
-											</div>
+											</button>
 										{/each}
 									{:else if activeTab === 'chapter'}
 										{#each getChaptersForCurrentBook() as chapter}
 											{#if searchTerm === '' || chapter.includes(searchTerm)}
-												<div
+												<button
 													class="dropdown-option {selectedChapter === chapter ? 'active' : ''}"
 													on:click={() => {
 														handleChapterChange(chapter);
 														activeTab = 'verse';
 													}}
+													on:keydown={(e) =>
+														e.key === 'Enter' &&
+														(() => {
+															handleChapterChange(chapter);
+															activeTab = 'verse';
+														})()}
+													role="option"
+													aria-selected={selectedChapter === chapter}
 												>
 													Capítulo {chapter}
-												</div>
+												</button>
 											{/if}
 										{/each}
 									{:else if activeTab === 'verse'}
-										<div
+										<button
 											class="dropdown-option {selectedVerse === null ? 'active' : ''}"
 											on:click={() => handleVerseChange(null)}
+											on:keydown={(e) => e.key === 'Enter' && handleVerseChange(null)}
+											role="option"
+											aria-selected={selectedVerse === null}
 										>
 											Todos los versículos
-										</div>
+										</button>
 										{#each filteredVerses as verse}
-											<div
+											<button
 												class="dropdown-option {selectedVerse?.toString() === verse
 													? 'active'
 													: ''}"
 												on:click={() => handleVerseChange(parseInt(verse))}
+												on:keydown={(e) => e.key === 'Enter' && handleVerseChange(parseInt(verse))}
+												role="option"
+												aria-selected={selectedVerse?.toString() === verse}
 											>
 												Versículo {verse}
-											</div>
+											</button>
 										{/each}
 									{/if}
 								</div>
@@ -911,6 +943,21 @@
 		border: 1px solid var(--bs-border-color);
 	}
 
+	.dropdown-options button {
+		background: none;
+		border: none;
+		width: 100%;
+		text-align: left;
+		padding: 10px 20px;
+		cursor: pointer;
+		color: inherit;
+	}
+
+	.dropdown-options button:focus {
+		outline: 2px solid var(--bs-primary);
+		outline-offset: -2px;
+	}
+
 	.search-box {
 		position: sticky;
 		top: 0;
@@ -977,20 +1024,101 @@
 	}
 
 	.scroll {
-		overflow-y: auto;
-		scroll-behavior: smooth;
-		position: fixed;
+		position: sticky;
 		top: 0;
-		left: 80px;
+		left: 0;
+		width: 100%;
+		z-index: 1000;
+		background-color: var(--bs-body-bg);
+		padding: 0.5rem;
+		margin: 0;
+		border-bottom: 1px solid var(--bs-border-color);
+	}
+
+	/* Elimina el margen (m-2) del div contenedor para móviles */
+	@media (max-width: 768px) {
+		.scroll {
+			position: sticky;
+			top: 0;
+			left: 0;
+			width: 100%;
+			padding: 0.5rem;
+			margin: 0 !important; /* Sobreescribe cualquier margen */
+		}
+
+		.scroll input {
+			width: 70% !important;
+		}
 	}
 
 	.scroll2 {
-		overflow-y: auto;
-		scroll-behavior: smooth;
-		position: fixed;
+		position: sticky;
+		top: auto;
+		bottom: 0;
+		left: 0;
 		width: 100%;
-		top: 880px;
-		left: 0px;
+		z-index: 1000;
+		background-color: var(--bs-body-bg);
+		border-top: 1px solid var(--bs-border-color);
+		padding: 0.5rem;
+	}
+
+	/* Ajustes específicos para móvil */
+	@media (max-width: 768px) {
+		.scroll2 {
+			position: fixed;
+			bottom: 0;
+			left: 0;
+			width: 100%;
+			padding: 0.5rem;
+			font-size: 0.8rem;
+		}
+
+		.card-header {
+			padding: 0.5rem !important;
+		}
+
+		.card-header .badge {
+			font-size: 0.7rem;
+		}
+
+		.card-header .separator {
+			display: none;
+		}
+	}
+
+	/* Asegura que el contenido principal no quede oculto */
+	main {
+		padding-bottom: 60px; /* Espacio para la barra inferior */
+		padding-top: 60px; /* Espacio para el buscador */
+	}
+
+	/* Ajusta el z-index del dropdown para que aparezca sobre todo */
+	.selector-dropdown {
+		z-index: 1100;
+		top: 60px !important; /* Debajo del buscador */
+	}
+
+	/* Botón flotante del selector */
+	.btn-floating-selector {
+		position: fixed;
+		bottom: 70px; /* Encima de la barra de información */
+		right: 20px;
+		width: 60px;
+		height: 60px;
+		border-radius: 50%;
+		font-size: 1.5rem;
+		z-index: 1050;
+	}
+
+	@media (max-width: 768px) {
+		.btn-floating-selector {
+			bottom: 80px;
+			right: 15px;
+			width: 50px;
+			height: 50px;
+			font-size: 1.2rem;
+		}
 	}
 
 	.verse-difference {
